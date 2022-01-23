@@ -151,16 +151,31 @@ inline void TransmitPulse(Pulse pulse)
 
 void SendPacket(uint16_t id, CommandFlag commandFlag, uint8_t strength)
 {
-  //U = Unknown Flags
+  //N = Channel ID (1 or 2)
   //C = Command
-  //I = ID?
+  //I = Collar ID
   //S = Strength
   //R = Reverse(Command | UFlags) ^ 0xFF
   
-  //UUUUUCCC IIIIIIII IIIIIIII SSSSSSSS RRRRRRRR
-  //10000001 00000010 00000011 01100100 01111110 S100
-  //10000010 00000010 00000011 01100100 10111110 V100
-  //10000100 00000010 00000011 01100100 11011110 B100
+  //NNNNCCCC IIIIIIII IIIIIIII SSSSSSSS RRRRRRRR
+  //10000001 00000010 00000011 01100100 01111110 1S100
+  //10000010 00000010 00000011 01100100 10111110 1V100
+  //10000100 00000010 00000011 00000000 11011110 1B000
+  //10001000 00010010 10101111 00000000 11101110 1F000
+  //11111000 00010010 10101111 00000000 11100000 2F000
+  //Channel 1 = 0b1000
+  //Channel 2 = 0b1111
+
+  /**
+   * Channel ID is fairly meaningless, since all collars
+   * can be reprogrammed to accept commands from either
+   * channel, and any ID number - so we don't bother
+   * providing a configuration option for it here.
+   * 
+   * To reprogram a PET998DR, long-press the power button
+   * until it beeps, and then send a command with the
+   * desired Channel ID and Collar ID
+   */
   
   unsigned long long data = 0LL;
   data |= (((unsigned long long) ((uint8_t)commandFlag | 0x80)) << 32);

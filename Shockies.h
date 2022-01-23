@@ -20,12 +20,13 @@ static unsigned char reverseLookup[16] = { 0x0, 0x8, 0x4, 0xc, 0x2, 0xa, 0x6, 0x
 /// BitFlags for commands that can be sent to the collar, or enabled as features.
 enum class CommandFlag : uint8_t
 {
-  None = 0,
-  Shock = 1,
-  Vibrate = 2,
-  Beep = 4,
-  All = 7,
-  Invalid = 255
+  None    = 0b00000000,
+  Shock   = 0b00000001,
+  Vibrate = 0b00000010,
+  Beep    = 0b00000100,
+  Light   = 0b00001000,
+  All     = 0b00001111,
+  Invalid = 0b11111111
 };
 
 /**
