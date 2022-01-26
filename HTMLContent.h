@@ -44,6 +44,10 @@ static const char* HTML_IndexDefault = R"HTML(
           <input type="number" id="shock_max_duration" name="shock_max_duration" min="1" max="10" value="%u"><br/>
         </div>
         <div>
+          <label for="shock_interval">Shock Interval:</label>
+          <input type="number" id="shock_interval" name="shock_interval" min="1" max="10" value="%u"><br/>
+        </div>
+        <div>
           <label for="vibrate_max_intensity">Max Vibrate Intensity:</label>
           <input type="number" id="vibrate_max_intensity" name="vibrate_max_intensity" min="1" max="100" value="%u"><br/>
         </div>

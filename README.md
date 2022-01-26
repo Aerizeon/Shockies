@@ -95,8 +95,9 @@ Allows the user to specified which features are enabled.
 
 #### Maximum Intensity Settings
 Specifies the maximum allowable intensity and continuious duration for Shock and Vibrate commands.
-* Max Shock Intensity - Default 50%
+* Max Shock Intensity - Default 30%
 * Max Shock Duration - Default 5 Seconds
+* Shock Interval - Default 3 Seconds
 * Max Vibrate Intensity - Default 100%
 * Max Vibrate Duration - Default 5 Seconds
 

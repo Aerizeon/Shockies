@@ -11,13 +11,6 @@
 WebSocketsServer webSocket(81);
 WebServer webServer(80);
 DNSServer dnsServer;
-
-/*
- * TODO: Add Duty Cycle limits for shocking, so we 
- * can stop the transmission if people are spamming the
- * button
- */
-
  
 void setup()
 {
@@ -30,9 +23,10 @@ void setup()
   EEPROM.get(0, featureSettings);
   if(featureSettings.Features == CommandFlag::Invalid){
     featureSettings.Features = CommandFlag::All;
-    featureSettings.ShockIntensity = 50;
+    featureSettings.ShockIntensity = 30;
     featureSettings.ShockDuration = 5;
-    featureSettings.VibrateIntensity = 100;
+    featureSettings.ShockInterval = 3;
+    featureSettings.VibrateIntensity = 50;
     featureSettings.VibrateDuration = 5;
     memset(featureSettings.WifiName, 0, 33);
     memset(featureSettings.WifiPassword, 0, 65);
@@ -79,7 +73,6 @@ void setup()
   xTaskCreatePinnedToCore(WebHandlerTask, "Web Handler Task", 10000, NULL, 1, &webHandlerTask, 0);
 }
 
-
 void loop()
 {
   uint32_t currentTime = millis();
@@ -94,7 +87,7 @@ void loop()
   if(currentTime - lastWatchdogTime > 1500)
     return;
   // If the current command has been executing for longer than the maximum duration
-  if(currentTime - currentCommand.Time > commandTimeout)
+  if(currentTime - currentCommand.StartTime > commandTimeout)
     return;
 
   // Transmit the current command to the collar
@@ -216,6 +209,7 @@ void HTTP_GET_Index()
     featureSettings.FeatureEnabled(CommandFlag::Shock) ? "checked" : "",
     featureSettings.ShockIntensity,
     featureSettings.ShockDuration,
+    featureSettings.ShockInterval,
     featureSettings.VibrateIntensity,
     featureSettings.VibrateDuration);
     webServer.send(200, "text/html", htmlBuffer); 
@@ -250,8 +244,10 @@ void HTTP_POST_Submit()
       featureSettings.EnableFeature(CommandFlag::Shock);
     featureSettings.ShockIntensity = webServer.arg("shock_max_intensity").toInt();
     featureSettings.ShockDuration = webServer.arg("shock_max_duration").toInt();
+    featureSettings.ShockInterval = webServer.arg("shock_interval").toInt();
     featureSettings.VibrateIntensity = webServer.arg("vibrate_max_intensity").toInt();
     featureSettings.VibrateDuration = webServer.arg("vibrate_max_duration").toInt();
+    WS_SendConfig();
   }
   
   if(webServer.hasArg("configure_wifi"))
@@ -278,6 +274,7 @@ void HTTP_POST_Submit()
   }
 }
 
+
 void WS_HandleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length)
 {
   switch(type) {
@@ -290,6 +287,7 @@ void WS_HandleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
             // send message to client
             webSocket.sendTXT(num, "OK: CONNECTED");
+            WS_SendConfig();
           }
           break;
       case WStype_TEXT:
@@ -313,13 +311,18 @@ void WS_HandleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
               }
 
               //Reset the current command status, and stop sending the command.
-              if(*command == 'R'){
+              if(*command == 'R')
+              {
+                uint32_t commandTimeout = ((currentCommand.Command == CommandFlag::Shock) ? featureSettings.ShockDuration : featureSettings.VibrateDuration) * 1000;
+                lastCommand = currentCommand;
+                lastCommand.EndTime = min((uint32_t)millis(), lastCommand.StartTime + commandTimeout);
                 currentCommand.Reset();
                 webSocket.sendTXT(num, "OK: R");
                 break;
               }
               //Triggers an emergency stop. This will require the ESP-32 to be rebooted.
-              else if(*command == 'X'){
+              else if(*command == 'X')
+              {
                 emergencyStop = true;
                 currentCommand.Reset();
                 webSocket.sendTXT(num, "OK: EMERGENCY STOP");
@@ -332,7 +335,8 @@ void WS_HandleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 break;
               }
 
-              if(id_str == 0 || intensity_str == 0) {
+              if(id_str == 0 || intensity_str == 0)
+              {
                 Serial.printf("[%u] Text Error: Invalid Message\n", num);
                 webSocket.sendTXT(num, "ERROR: INVALID FORMAT");
                 break;
@@ -342,20 +346,40 @@ void WS_HandleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
               uint8_t intensity = atoi(intensity_str);
 
               //Beep - Intensity is not used.
-              if(*command == 'B' && featureSettings.FeatureEnabled(CommandFlag::Beep)){
+              if(*command == 'B' && featureSettings.FeatureEnabled(CommandFlag::Beep))
+              {
                 currentCommand.Set(id, CommandFlag::Beep, intensity);
                 webSocket.sendTXT(num, "OK: B");
                 break;
               }
               //Vibrate
-              else if(*command == 'V' && featureSettings.FeatureEnabled(CommandFlag::Vibrate)) {
+              else if(*command == 'V' && featureSettings.FeatureEnabled(CommandFlag::Vibrate))
+              {
                 currentCommand.Set(id, CommandFlag::Vibrate, intensity);
                 webSocket.sendTXT(num, "OK: V");
                 break;
               }
               //Shock
-              else if(*command == 'S' && featureSettings.FeatureEnabled(CommandFlag::Shock)) {
-                currentCommand.Set(id, CommandFlag::Shock, intensity);
+              else if(*command == 'S' && featureSettings.FeatureEnabled(CommandFlag::Shock))
+              {
+                if(millis() - lastCommand.EndTime < max(1, (int)featureSettings.ShockInterval) * 1000)
+                {
+                  if((lastCommand.EndTime - lastCommand.StartTime) < featureSettings.ShockDuration * 1000)
+                  {
+                    currentCommand.StartTime = millis() - (lastCommand.EndTime - lastCommand.StartTime);
+                  }
+                  else
+                  {
+                    currentCommand.StartTime = lastCommand.StartTime;
+                  }
+                  currentCommand.CollarId = id;
+                  currentCommand.Intensity = intensity;
+                  currentCommand.Command = CommandFlag::Shock;
+                }
+                else
+                {
+                  currentCommand.Set(id, CommandFlag::Shock, intensity);
+                }
                 webSocket.sendTXT(num, "OK: S");
                 break;
               }
@@ -374,4 +398,17 @@ void WS_HandleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
   case WStype_FRAGMENT_FIN:
     break;
   }
+}
+
+void WS_SendConfig()
+{
+  char configBuffer[256];
+  sprintf(configBuffer, "CONFIG:%04X%02X%02X%02X%02X%02X",
+  65535,
+  featureSettings.Features,
+  featureSettings.ShockIntensity,
+  featureSettings.ShockDuration,
+  featureSettings.VibrateIntensity,
+  featureSettings.VibrateDuration);
+  webSocket.broadcastTXT(configBuffer);
 }

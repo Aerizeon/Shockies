@@ -40,6 +40,8 @@ struct EEPROM_Settings
   uint8_t ShockIntensity = 0;
   /// Determines how long a single shock command can last
   uint8_t ShockDuration = 0;
+  ///Determines how long to wait between shocks of maximum length
+  uint8_t ShockInterval = 0;
   /// Determines max vibrate strength (0 - 100)
   uint8_t VibrateIntensity = 0;
   /// Determines how long a single vibrate command can last
@@ -48,7 +50,7 @@ struct EEPROM_Settings
   char WifiName[33];
   /// Password for the Wi-Fi network
   char WifiPassword[65];
-
+  
   /**
    * Enable the specified feature(s)
    * 
@@ -83,7 +85,8 @@ struct CommandState
   /// Current intensity
   uint8_t Intensity = 0;
   /// Time command was issued
-  uint32_t Time = 0;
+  uint32_t StartTime = 0;
+  uint32_t EndTime = 0;
 
   /// Reset all attributes on this CommandState
   void Reset()
@@ -91,7 +94,8 @@ struct CommandState
     CollarId = 0;
     Command = CommandFlag::None;
     Intensity = 0;
-    Time = 0;
+    StartTime = 0;
+    EndTime = 0;
   }
 
   /**
@@ -104,12 +108,14 @@ struct CommandState
   void Set(uint32_t collarId, CommandFlag commandFlag, uint8_t intensity)
   {
     CollarId = collarId;
-    Command = commandFlag;
     Intensity  = min(intensity, commandFlag == CommandFlag::Shock ? featureSettings.ShockIntensity : featureSettings.VibrateIntensity);
-    Time = millis();
-    lastWatchdogTime = Time;
+    StartTime = millis();
+    lastWatchdogTime = StartTime;
+    Command = commandFlag;
   }
 } currentCommand;
+
+CommandState lastCommand;
 
 /**
  * Pulse specification for individual OOK/ASK codes
@@ -169,6 +175,8 @@ void HTTP_POST_Submit();
 
 /// Handler for WebSocket events.
 void WS_HandleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length);
+
+void WS_SendConfig();
 
 /**
  * Reverse the bits in an unsigned byte
