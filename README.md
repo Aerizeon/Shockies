@@ -1,5 +1,5 @@
 # Shockies
-ESP-32 Firmware for controlling **Petrainer PET998DR** collars using a **STX882 433.9Mhz ASK Transmitter**
+ESP32 Firmware for controlling **Petrainer PET998DR** collars using a **STX882 433.9Mhz ASK Transmitter**
 
 ## Disclaimer
 I am not responsible for how you use or misuse this software, or any hardware controlled by this software.
@@ -26,6 +26,34 @@ I am not responsible for any malfunctions, and make no guarantees about safety o
   - Can be found on [Amazon](https://www.amazon.com/dp/B09KY28VH8)
 * MicroUSB Cable
   - Used to connect to your PC, or to your power supply in standalone mode.
+* [Male to Female Jumpers](https://www.amazon.com/HiLetgo-Breadboard-Prototype-Assortment-Raspberry/dp/B077X7MKHN)
+* Soldering iron + Solder
+  - Used to connect the jumpers and antenna to the STX882 Transmitter card.
+## Assembly
+You will need the following:
+ * ESP32
+ * STX882 Transmitter
+ * STX882 Transmitter Antenna (looks like a coiled spring)
+ * Male to Female Jumper Wire
+ * Soldering Iron
+ * Solder
+
+1. Preheat Soldering iron to the temperature required for the solder you're using.
+2. Separate a set of 3 jumper wires from the bundle, and set the remaining wires aside. You only need 3 Male to Female wires for this project.
+3. Carefully solder the antenna to the ANT connection on the STX882 Transmitter. It should point straight up, away from the body of the transmitter for best range.
+   - The ANT pin might be unlabled - it is the hole at the top of the card, opposite the DATA/VCC/GND Pins.
+4. Carefully solder the Male side of each jumper to the DATA, VCC, and GND pins on the STX882 Transmitter.
+   - Color doesn't really matter here - use whatever you'd like, just make sure they're visualy distinct from each other.
+6. Turn off soldering iron, it is no longer needed.
+
+Once the transmitter is sufficiently cool, make the following connections:
+| ESP32 | Transmitter|
+| ----- | ---------- |
+| +5V   | VCC        |
+| GND   | GND        |
+| P4    | DATA       |
+
+Once you verify these connections are correct, you're now ready to connect the ESP32 to your computer, and move on to **Setup**
 
 ## Setup
 Setting up Shockies and your collar
