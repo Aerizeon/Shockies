@@ -134,6 +134,10 @@ Please **CAREFULLY** experiment starting with low (<5%) shock intensity, and slo
 ## NeosVR Control
 Message Epsilion for more information.
 
+An alpha implementation can be found in the follwing public folder:
+
+`neosrec:///U-Epsilion/R-4af8f73a-3765-4ff7-ada0-cdd199286215`
+
 ## Web Control
 *Not yet implemented*
 
