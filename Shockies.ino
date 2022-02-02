@@ -111,6 +111,7 @@ void WebHandlerTask(void* parameter)
   webServer.on("/", HTTP_GET, HTTP_GET_Index);
   webServer.on("/fwlink", HTTP_GET, HTTP_GET_Index);
   webServer.on("/generate_204", HTTP_GET, HTTP_GET_Index);
+  webServer.on("/wificonfig", HTTP_GET, HTTP_GET_WifiConfig);
   webServer.on("/control", HTTP_GET, HTTP_GET_Control);
   webServer.on("/submit", HTTP_POST, HTTP_POST_Submit);
   Serial.println("Starting WebSocket Server on port 81...");
@@ -223,6 +224,15 @@ void HTTP_GET_Index()
     featureSettings.WifiPassword);
     webServer.send(200, "text/html", htmlBuffer); 
   }
+}
+
+void HTTP_GET_WifiConfig()
+{
+  sprintf(htmlBuffer,
+    HTML_IndexConfigureSSID,
+    featureSettings.WifiName,
+    featureSettings.WifiPassword);
+    webServer.send(200, "text/html", htmlBuffer); 
 }
 
 void HTTP_GET_Control()

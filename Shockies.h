@@ -167,6 +167,9 @@ void WebHandlerTask(void* parameter);
 /// HTTP Handler for '/' 
 void HTTP_GET_Index();
 
+/// HTTP Handler for '/wificonfig'
+void HTTP_GET_WifiConfig();
+
 /// HTTP Handler for '/Control'
 void HTTP_GET_Control();
 
