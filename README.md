@@ -59,7 +59,7 @@ Once you verify these connections are correct, you're now ready to connect the E
 Setting up Shockies and your collar
 ### Arduino IDE & Flashing
 1. Download the arduino IDE from the [arduino.cc website](https://www.arduino.cc/en/software/) or the [Microsoft App Store](https://www.microsoft.com/store/apps/9nblggh4rsd8)
-2. Follow [these instructions](https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html#installing-using-boards-manager) to install ESP32 Board support for the Arduino IDE
+2. Follow [these instructions](https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html#installing-using-boards-manager) to install ESP32 Board support for the Arduino IDE - use the stable branch URL.
 3. Double click **Shockies.ino** to open it in the Arduino editor
 4. Configure the correct board settings (May differ if using something other than the HiLetGo ESP32 Developer Board)
    - Select the following board: Tools > Board > ESP32 Arduino > Node32s
@@ -68,9 +68,10 @@ Setting up Shockies and your collar
      - The correct port will depend on your computer
      - Open device manager (on windows), expand 'Ports (COM and LPT)' and find an entry with 'Silicon Labs CP210x USB to UART Bridge'
      - If no device exists, you may need to install the [CP210x Driver](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers)
- 5. Select Tools > Serial Monitor to view the debug output from your board.
+ 5. Install the "WebSockets" library by Markus Sattler, currently version 2.3.5
+ 6. Select Tools > Serial Monitor to view the debug output from your board.
     - Make sure the Baud Rate is set to 9600
- 6. Select Sketch > Upload to upload to your ESP32 board.
+ 7. Select Sketch > Upload to upload to your ESP32 board.
     - You may need to hold down the IO0 button (right-hand button on the HiLetGo ESP32 Developer Board) during the upload process
 
 ### Wi-Fi Setup
