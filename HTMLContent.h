@@ -162,6 +162,18 @@ static const char* HTML_IndexDefault = R"HTML(
           webSocket.send("R");
         }
       });
+      button.addEventListener('touchstart', e => {
+        if(webSocket != null && webSocket.readyState == WebSocket.OPEN) {
+          var mode = document.querySelector('input[name="mode"]:checked').value;
+          var intensity = document.querySelector('input[name="intensity"]').value;
+          webSocket.send(mode + " 0 " + intensity);
+        }
+      });
+      button.addEventListener('touchend', e => {
+        if(webSocket != null && webSocket.readyState == WebSocket.OPEN) {
+          webSocket.send("R");
+        }
+      });
       window.setInterval(function(){
         if(webSocket != null && webSocket.readyState == WebSocket.OPEN) {
           webSocket.send("P");
@@ -353,7 +365,7 @@ static const char* HTML_IndexConfigureSSID = R"HTML(
   <body>
     <h1>Shockies</h1>
     <h3>Wi-Fi Configuration</h3>
-    <form action="/submit" method="post">
+    <form action="/submit" method="post" accept-charset="utf-8">
       <fieldset id="wifi_settings">
         <legend>Wi-Fi Settings</legend>
         <div>

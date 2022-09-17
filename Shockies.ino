@@ -67,6 +67,7 @@ void setup()
   {
     Serial.println("Connecting to Wi-Fi..."); 
     Serial.printf("SSID: %s\n", settings.WifiName);
+    Serial.printf("Password: %s\n", settings.WifiPassword);
     WiFi.mode(WIFI_STA);
     WiFi.begin(settings.WifiName, settings.WifiPassword);
     wifiConnectTime = millis();
@@ -396,6 +397,7 @@ void WS_HandleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
           break;
       case WStype_TEXT:
           {   
+              Serial.printf("[%u] Message: %s\r\n", num, payload);
               if(emergencyStop)
               {
                 Serial.printf("[%u] EMERGENCY STOP\nDevice will not accept commands until rebooted.\n", num);
@@ -409,7 +411,7 @@ void WS_HandleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 
               if(command == 0)
               {
-                Serial.printf("[%u] Text Error: Invalid Message", num);
+                Serial.printf("[%u] Text Error: Invalid Message\r\n", num);
                 webSocket.sendTXT(num, "ERROR: INVALID FORMAT");
                 break;
               }
