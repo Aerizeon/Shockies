@@ -1,10 +1,14 @@
 #ifndef _Shockies_h
 #define _Shockies_h
 #include <WebSocketsServer.h>
+#include <ESPAsyncWebServer.h>
 
 #define UUID_STR_LEN 37
 #define SHOCKIES_BUILD 4
 typedef uint8_t uuid_t[16];
+
+/// Reboot the ESP32
+bool rebootDevice = false;
 
 /// Stops transmitting all commands, and locks device.
 bool emergencyStop = false;
@@ -85,9 +89,9 @@ struct EEPROM_Settings
   /// Password for the Wi-Fi network
   char WifiPassword[65];
   /// Device UUID for websocket endpoint.
-  char DeviceID[UUID_STR_LEN];
+  char DeviceId[UUID_STR_LEN];
   /// Require DeviceID to be part of the local websocket URI (ws://shockies.local/<deviceID>)
-  bool RequireDeviceID = false;
+  bool RequireDeviceId = false;
   /// Allow the device to be controlled from shockies.dev (not yet implemented - TODO)
   bool AllowRemoteAccess = false;
   /// Allow up to 3 devices to be configured
@@ -186,19 +190,16 @@ void SendPacket(uint16_t id, CommandFlag commandFlag, uint8_t strength);
 void WebHandlerTask(void* parameter);
 
 /// HTTP Handler for '/' 
-void HTTP_GET_Index();
+void HTTP_GET_Index(AsyncWebServerRequest *request);
 
 /// HTTP Handler for '/wificonfig'
-void HTTP_GET_WifiConfig();
-
-/// HTTP Handler for '/Control'
-void HTTP_GET_Control();
+void HTTP_GET_WifiConfig(AsyncWebServerRequest *request);
 
 /// HTTP Handler for '/Submit'
-void HTTP_POST_Submit();
+void HTTP_POST_Submit(AsyncWebServerRequest *request);
 
 /// Handler for WebSocket events.
-void WS_HandleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length);
+void WS_HandleEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
 
 void WS_SendConfig();
 
