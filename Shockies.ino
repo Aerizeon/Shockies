@@ -6,6 +6,7 @@
 #include <DNSServer.h>
 #include <EEPROM.h>
 #include <SPIFFS.h>
+#include <Update.h>
 
 AsyncWebServer webServer(80);
 AsyncWebSocket *webSocket;
@@ -19,13 +20,16 @@ void setup()
   Serial.setDebugOutput(true);
   Serial.println();
   Serial.println("Device is booting...");
+
   if(!SPIFFS.begin(true))
   {
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
   }
+
   EEPROM.begin(sizeof(settings));
   EEPROM.get(0, settings);
+
   if(settings.CurrentBuild != SHOCKIES_BUILD){
     for(int dev = 0; dev < 3; dev++)
     {
@@ -113,8 +117,12 @@ void setup()
   webServer.on("/", HTTP_GET, HTTP_GET_Index);
   webServer.on("/fwlink", HTTP_GET, HTTP_GET_Index);
   webServer.on("/generate_204", HTTP_GET, HTTP_GET_Index);
-  webServer.on("/wificonfig", HTTP_GET, HTTP_GET_WifiConfig);
+
   webServer.on("/submit", HTTP_POST, HTTP_POST_Submit);
+  webServer.on("/update", HTTP_GET, HTTP_GET_Update);
+  webServer.on("/update", HTTP_POST, HTTP_POST_Update, HTTP_FILE_Update);
+  webServer.serveStatic("/styles.css", SPIFFS, "/styles.css");
+
 
   webServer.begin();
   webServer.addHandler(webSocket);
@@ -316,26 +324,29 @@ void HTTP_GET_Index(AsyncWebServerRequest *request)
   //Otherwise we're in SoftAP mode
   else
   {
-    if(request->host() == "shockies.local" || request->host() != String(WiFi.softAPIP()))
+    if(request->host() == "shockies.local" || request->host() == String(WiFi.softAPIP()))
     {
       request->send(SPIFFS, "/setup.html", String(), false, templateProcessor);
     }
-    request->redirect("http://" + String(WiFi.softAPIP()));
+    else
+    {
+      request->redirect("http://" + String(WiFi.softAPIP()));
+    }
   }
 }
-
-void HTTP_GET_WifiConfig(AsyncWebServerRequest *request)
+void HTTP_GET_Update(AsyncWebServerRequest *request)
 {
-  request->send(SPIFFS, "/setup.html", String(), false, templateProcessor);
+  if(!request->authenticate("admin", settings.WifiPassword))
+  {
+    return request->requestAuthentication();
+  }
+  request->send(SPIFFS, "/update.html");
 }
-
 
 void HTTP_POST_Submit(AsyncWebServerRequest *request)
 {
-  Serial.println("Post Enter");
   if(request->hasParam("configure_features", true))
   {
-    Serial.println("Configure Features");
     for(int devId = 0; devId < 2; devId++)
     {
       settings.Devices[devId].Features = CommandFlag::None;
@@ -369,7 +380,6 @@ void HTTP_POST_Submit(AsyncWebServerRequest *request)
   }
   else if(request->hasParam("configure_wifi", true))
   {
-    Serial.println("Configure WiFi");
     if(request->hasParam("wifi_ssid", true))
       request->getParam("wifi_ssid", true)->value().toCharArray(settings.WifiName, 33);
     if(request->hasParam("wifi_password", true))
@@ -379,10 +389,63 @@ void HTTP_POST_Submit(AsyncWebServerRequest *request)
     Serial.println("Wi-Fi configuration changed, rebooting...");
     rebootDevice = true;
   }
-  Serial.println("Post Exit");
   request->redirect("http://shockies.local");
 }
 
+void HTTP_POST_Update(AsyncWebServerRequest *request)
+{
+  if(!request->authenticate("admin", settings.WifiPassword))
+  {
+    return request->requestAuthentication();
+  }
+  AsyncWebServerResponse *response = request->beginResponse(Update.hasError() ? 500 : 200, "text/plain", Update.hasError() ? "Update Failed. Rebooting." : "Update Succeeded. Rebooting");
+  response->addHeader("Connection", "close");
+  request->send(response);
+  rebootDevice = true;
+}
+
+void HTTP_FILE_Update(AsyncWebServerRequest *request, String fileName, size_t index, uint8_t *data, size_t len, bool final)
+{
+  if(!request->authenticate("admin", settings.WifiPassword))
+  {
+    return request->requestAuthentication();
+  }
+
+  if(index == 0)
+  {
+    Serial.println(fileName);
+    if(fileName == "Shockies.ino.bin")
+    {
+      if(!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH))
+      {
+        return request->send(400, "text/plain", "Update Unable to start");
+      }
+    }
+    else if(fileName == "Shockies.spiffs.bin")
+    {
+      if(!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS))
+      {
+        return request->send(400, "text/plain", "Update Unable to start");
+      }
+    }
+  }
+
+  if(len > 0)
+  {
+      if(!Update.write(data, len))
+      {
+        return request->send(400, "text/plain", "Update Unable to write");
+      }    
+  }
+
+  if(final)
+  {
+    if(!Update.end(true))
+    {
+      return request->send(400, "text/plain", "Update Unable to finish update");
+    }       
+  }
+}
 
 void WS_HandleEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
 {

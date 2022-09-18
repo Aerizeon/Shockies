@@ -1,6 +1,5 @@
 #ifndef _Shockies_h
 #define _Shockies_h
-#include <WebSocketsServer.h>
 #include <ESPAsyncWebServer.h>
 
 #define UUID_STR_LEN 37
@@ -192,11 +191,17 @@ void WebHandlerTask(void* parameter);
 /// HTTP Handler for '/' 
 void HTTP_GET_Index(AsyncWebServerRequest *request);
 
-/// HTTP Handler for '/wificonfig'
-void HTTP_GET_WifiConfig(AsyncWebServerRequest *request);
+/// HTTP Handler for '/Update'
+void HTTP_GET_Update(AsyncWebServerRequest *request);
 
 /// HTTP Handler for '/Submit'
 void HTTP_POST_Submit(AsyncWebServerRequest *request);
+
+/// HTTP Handler for '/Update'
+void HTTP_POST_Update(AsyncWebServerRequest *request);
+
+/// File Handler for '/Update'
+void HTTP_FILE_Update(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
 
 /// Handler for WebSocket events.
 void WS_HandleEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
