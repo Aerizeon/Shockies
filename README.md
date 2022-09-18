@@ -69,9 +69,9 @@ Setting up Shockies and your collar
      - Open device manager (on windows), expand 'Ports (COM and LPT)' and find an entry with 'Silicon Labs CP210x USB to UART Bridge'
      - If no device exists, you may need to install the [CP210x Driver](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers)
  5. Install The following libraries:
-   - [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
-   - [AsyncTCP](https://github.com/me-no-dev/AsyncTCP)
- 6. Install the [ESP32 Filesystem Uploader](https://github.com/me-no-dev/arduino-esp32fs-plugin) for Arduino IDE 1.x. This will be used to upload the files under /data/
+    - [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
+    - [AsyncTCP](https://github.com/me-no-dev/AsyncTCP)
+ 6. Install the [ESP32 Filesystem Uploader](https://github.com/me-no-dev/arduino-esp32fs-plugin) for Arduino IDE 1.x. This will be used to upload the files under `/data/`
  7. Select Tools > Serial Monitor to view the debug output from your board.
     - Make sure the Baud Rate is set to 9600
  8. Select Sketch > Upload to upload the firmware to your ESP32.
