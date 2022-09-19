@@ -49,14 +49,12 @@
 			  webSocket.send("P");
 			}
 		  }, 1000);
-		  console.log("Loaded");
 		});
 	</script>
   </head>
   <body>
 	<main>
-		<h1>Shockies</h1>
-		<h3>Configuration</h3>
+		<h1>Safety Configuration</h1>
 		<form action="/submit" method="post">
 			<div class="tab-wrap">
 			  <input type="radio" id="tab1" name="tabGroup1" class="tab" checked>
@@ -68,7 +66,7 @@
 			  <input type="radio" id="tab4" name="tabGroup1" class="tab">
 			  <label for="tab4">Security</label>
 			  <input type="radio" id="tab5" name="tabGroup1" class="tab">
-			  <label for="tab5">Local Control</label>
+			  <label for="tab5">Control</label>
 			  <div class="tab__content">  
 				<div>
 				  <label for="device_id0">Device ID:</label>
@@ -84,7 +82,7 @@
 				<label for="feature_shock0">Shock</label><br/>
 				</fieldset>
 				<br>
-				<fieldset id="intensity_settings">
+				<fieldset class="flex-column flex-end">
 				<legend>Maximum Intensity Settings</legend>
 				<div>
 				  <label for="shock_max_intensity0">Max Shock Intensity:</label>
@@ -123,7 +121,7 @@
 				<label for="feature_shock1">Shock</label><br/>
 				</fieldset>
 				<br>
-				<fieldset id="intensity_settings">
+				<fieldset class="flex-column flex-end">
 				<legend>Maximum Intensity Settings</legend>
 				<div>
 				  <label for="shock_max_intensity1">Max Shock Intensity:</label>
@@ -162,7 +160,7 @@
 				<label for="feature_shock2">Shock</label><br/>
 				</fieldset>
 				<br>
-				<fieldset id="intensity_settings">
+				<fieldset class="flex-column flex-end">
 				<legend>Maximum Intensity Settings</legend>
 				<div>
 				  <label for="shock_max_intensity2">Max Shock Intensity:</label>
@@ -191,9 +189,10 @@
 				<label for="require_device_id">Require device ID for local control</label><br/>
 				<input type="checkbox" id="allow_remote_access" name="allow_remote_access" title="Allow this device to be controlled via shockies.dev" %AllowRemoteAccess%>
 				<label for="allow_remote_access">Allow Remote Access</label><br/>
-				<div>
+				<div class="flex-column flex-center">
 				<a href="http://shockies.local/update">Update Firmware</a>
 				</div>
+				
 			  </div>
 			  <div class="tab__content">
 				<fieldset>
@@ -214,6 +213,7 @@
 			<input class="button" type="submit" value="Save"/>
 		</form>
 		<pre>ws://shockies.local/websocket/%DeviceId%</pre>
+		<pre>Shockies Version %VersionString%</pre>
 	</main>  
   </body>
 </html>

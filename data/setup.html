@@ -7,23 +7,24 @@
 	<link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <h1>Shockies</h1>
-    <h3>Wi-Fi Configuration</h3>
-    <form action="/submit" method="post" accept-charset="utf-8">
-      <fieldset id="wifi_settings">
-        <legend>Wi-Fi Settings</legend>
-        <div>
-          <label for="wifi_ssid">SSID:</label>
-          <input type="text" id="wifi_ssid" name="wifi_ssid" minlength="1" maxlength="32" value="%WifiName%"><br/>
-        </div>
-        <div>
-          <label for="wifi_password">Password:</label>
-          <input type="text" id="wifi_password" name="wifi_password" minlength="8" maxlength="64" value="%WifiPassword%"><br/>
-        </div>
-      </fieldset>
-      <br>
-      <input type="hidden" name="configure_wifi" value="true"/>
-      <input class="button" type="submit" Value="Save"/>
-    </form>
+	<main>
+		<h1>Wi-Fi Configuration</h1>
+		<form action="/submit" method="post" accept-charset="utf-8">
+		  <fieldset id="wifi_settings">
+			<legend>Wi-Fi Settings</legend>
+			<div>
+			  <label for="wifi_ssid">SSID:</label>
+			  <input type="text" id="wifi_ssid" name="wifi_ssid" minlength="1" maxlength="32" value="%WifiName%"><br/>
+			</div>
+			<div>
+			  <label for="wifi_password">Password:</label>
+			  <input type="text" id="wifi_password" name="wifi_password" minlength="8" maxlength="64" value="%WifiPassword%"><br/>
+			</div>
+		  </fieldset>
+		  <br>
+		  <input type="hidden" name="configure_wifi" value="true"/>
+		  <input class="button" type="submit" Value="Save"/>
+		</form>
+	</main>
   </body>
 </html>

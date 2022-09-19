@@ -8,11 +8,10 @@
   </head>
   <body>
 	<main>
-		<h1>Shockies</h1>
-		<h3>Update</h3>
+		<h1>Firmware Update</h1>
 		<form action="/update" method="post" enctype="multipart/form-data">
 			<label for="firmware">Firmware:</label>
-			<input id="firmware" name="uploadfile" type="file" accept=".bin">
+			<input id="firmware" name="uploadfile" type="file" accept=".bin" multiple>
 			<input class="button" type="submit" value="Update"/>
 		</form>
 	</main>  

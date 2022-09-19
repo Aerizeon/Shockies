@@ -30,7 +30,7 @@ void setup()
   EEPROM.begin(sizeof(settings));
   EEPROM.get(0, settings);
 
-  if(settings.CurrentBuild != SHOCKIES_BUILD){
+  if(settings.SettingsVersion != SHOCKIES_SETTINGS_VERSION){
     for(int dev = 0; dev < 3; dev++)
     {
       if(dev == 0)
@@ -62,7 +62,7 @@ void setup()
     memset(settings.DeviceId, 0, UUID_STR_LEN);
     settings.RequireDeviceId = false;
     settings.AllowRemoteAccess = false;
-    settings.CurrentBuild = SHOCKIES_BUILD;
+    settings.SettingsVersion = SHOCKIES_SETTINGS_VERSION;
     uuid_t deviceID;
     UUID_Generate(deviceID);
     UUID_ToString(deviceID, settings.DeviceId);
@@ -77,11 +77,13 @@ void setup()
     Serial.println("Connecting to Wi-Fi..."); 
     Serial.printf("SSID: %s\n", settings.WifiName);
     Serial.printf("Password: %s\n", settings.WifiPassword);
+    
     WiFi.mode(WIFI_STA);
     WiFi.begin(settings.WifiName, settings.WifiPassword);
     wifiConnectTime = millis();
     while(WiFi.status() != WL_CONNECTED && millis() - wifiConnectTime < 10000)
     {
+      yield();
       delay(1000);
     }
   }
@@ -94,13 +96,20 @@ void setup()
   {
     Serial.println("Failed to connect to Wi-Fi");
     Serial.println("Creating temporary Access Point for configuration...");
+    
     WiFi.mode(WIFI_AP);
+
     if(WiFi.softAP("ShockiesConfig", "zappyzap"))
     {
       Serial.println("Access Point created!");
       Serial.println("SSID: ShockiesConfig");
       Serial.println("Pass: zappyzap");
     }
+    else
+    {
+      Serial.println("Failed to create Acces Point");
+    }
+
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(53, "*", WiFi.softAPIP());
   }
@@ -114,15 +123,19 @@ void setup()
   webSocketId->onEvent(WS_HandleEvent);
   
   Serial.println("Starting HTTP Server on port 80...");
+
+  // Main configuration page
   webServer.on("/", HTTP_GET, HTTP_GET_Index);
+  // Captive Portal
   webServer.on("/fwlink", HTTP_GET, HTTP_GET_Index);
   webServer.on("/generate_204", HTTP_GET, HTTP_GET_Index);
-
+  // Configuration changes
   webServer.on("/submit", HTTP_POST, HTTP_POST_Submit);
+  // Updater
   webServer.on("/update", HTTP_GET, HTTP_GET_Update);
   webServer.on("/update", HTTP_POST, HTTP_POST_Update, HTTP_FILE_Update);
+  // Global stylesheet
   webServer.serveStatic("/styles.css", SPIFFS, "/styles.css");
-
 
   webServer.begin();
   webServer.addHandler(webSocket);
@@ -178,8 +191,6 @@ void loop()
   SendPacket(settings.Devices[currentCommand.DeviceIndex].DeviceId, currentCommand.Command, currentCommand.Intensity);
 
 }
-
-
 
 inline void TransmitPulse(Pulse pulse)
 {
@@ -250,6 +261,8 @@ String templateProcessor(const String& var)
     return settings.WifiName;
   else if(var == "WifiPassword")
     return settings.WifiPassword;
+  else if(var == "VersionString")
+    return SHOCKIES_VERSION;
 
   // Device 0
   else if(var == "Device0.DeviceId")
