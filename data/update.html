@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Shockies - Update</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+	<link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+	<main>
+		<h1>Firmware Update</h1>
+		<form action="/update" method="post" enctype="multipart/form-data">
+			<label for="firmware">Firmware:</label>
+			<input id="firmware" name="uploadfile" type="file" accept=".bin" multiple>
+			<input class="button" type="submit" value="Update"/>
+		</form>
+	</main>  
+  </body>
+</html>

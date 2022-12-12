@@ -1,10 +1,18 @@
 #ifndef _Shockies_h
 #define _Shockies_h
-#include <WebSocketsServer.h>
+#include <ESPAsyncWebServer.h>
 
 #define UUID_STR_LEN 37
-#define SHOCKIES_BUILD 4
+#define SHOCKIES_SETTINGS_VERSION 4
+#define SHOCKIES_VERSION "1.2.0"
+
 typedef uint8_t uuid_t[16];
+
+/// Reboot the ESP32
+bool rebootDevice = false;
+
+/// Software update is available
+bool updateAvailable = false;
 
 /// Stops transmitting all commands, and locks device.
 bool emergencyStop = false;
@@ -12,11 +20,8 @@ bool emergencyStop = false;
 /// When the last ping was sent from a given controller. 
 uint32_t lastWatchdogTime = 0;
 
-/// TaskHandle for WebHandlerTask
-TaskHandle_t webHandlerTask;
-
-/// Temporary buffer for HTML that requires post-processing
-static char htmlBuffer[22000];
+/// Last time an update check was performed
+uint32_t lastUpdateCheck = 0;
 
 /// Lookup Table for Byte Reversal code
 static unsigned char reverseLookup[16] = { 0x0, 0x8, 0x4, 0xc, 0x2, 0xa, 0x6, 0xe, 0x1, 0x9, 0x5, 0xd, 0x3, 0xb, 0x7, 0xf, };
@@ -79,15 +84,15 @@ struct DeviceSettings
  */
 struct EEPROM_Settings
 {
-  uint16_t CurrentBuild;
+  uint16_t SettingsVersion;
   /// Name of the Wi-Fi SSID to connect to on boot
   char WifiName[33];
   /// Password for the Wi-Fi network
   char WifiPassword[65];
   /// Device UUID for websocket endpoint.
-  char DeviceID[UUID_STR_LEN];
+  char DeviceId[UUID_STR_LEN];
   /// Require DeviceID to be part of the local websocket URI (ws://shockies.local/<deviceID>)
-  bool RequireDeviceID = false;
+  bool RequireDeviceId = false;
   /// Allow the device to be controlled from shockies.dev (not yet implemented - TODO)
   bool AllowRemoteAccess = false;
   /// Allow up to 3 devices to be configured
@@ -186,19 +191,22 @@ void SendPacket(uint16_t id, CommandFlag commandFlag, uint8_t strength);
 void WebHandlerTask(void* parameter);
 
 /// HTTP Handler for '/' 
-void HTTP_GET_Index();
+void HTTP_GET_Index(AsyncWebServerRequest *request);
 
-/// HTTP Handler for '/wificonfig'
-void HTTP_GET_WifiConfig();
-
-/// HTTP Handler for '/Control'
-void HTTP_GET_Control();
+/// HTTP Handler for '/Update'
+void HTTP_GET_Update(AsyncWebServerRequest *request);
 
 /// HTTP Handler for '/Submit'
-void HTTP_POST_Submit();
+void HTTP_POST_Submit(AsyncWebServerRequest *request);
+
+/// HTTP Handler for '/Update'
+void HTTP_POST_Update(AsyncWebServerRequest *request);
+
+/// File Handler for '/Update'
+void HTTP_FILE_Update(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
 
 /// Handler for WebSocket events.
-void WS_HandleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length);
+void WS_HandleEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
 
 void WS_SendConfig();
 

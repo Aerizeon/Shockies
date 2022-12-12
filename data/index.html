@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Shockies - Safety Configuration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+	<link rel="stylesheet" href="styles.css">
+	<script type="text/javascript">
+		document.addEventListener("DOMContentLoaded", function() { 
+		  var webSocket = null;
+		  var button = document.querySelector('#sendButton');
+		  
+		  if(window.location.protocol == 'file:') {
+			webSocket = new WebSocket("ws://shockies.local/websocket/");
+		  }
+		  else {
+			webSocket = new WebSocket("ws://" + window.location.hostname + "/websocket/%DeviceId%");
+		  }
+		  webSocket.addEventListener('open', function (event) {
+			button.disabled = false;
+		  });
+		  
+		  button.addEventListener('mousedown', e => {
+			if(webSocket != null && webSocket.readyState == WebSocket.OPEN) {
+			  var mode = document.querySelector('input[name="mode"]:checked').value;
+			  var intensity = document.querySelector('input[name="intensity"]').value;
+			  webSocket.send(mode + " 0 " + intensity);
+			}
+		  });
+		  button.addEventListener('mouseup', e => {
+			if(webSocket != null && webSocket.readyState == WebSocket.OPEN) {
+			  webSocket.send("R");
+			}
+		  });
+		  button.addEventListener('touchstart', e => {
+			if(webSocket != null && webSocket.readyState == WebSocket.OPEN) {
+			  var mode = document.querySelector('input[name="mode"]:checked').value;
+			  var intensity = document.querySelector('input[name="intensity"]').value;
+			  webSocket.send(mode + " 0 " + intensity);
+			}
+		  });
+		  button.addEventListener('touchend', e => {
+			if(webSocket != null && webSocket.readyState == WebSocket.OPEN) {
+			  webSocket.send("R");
+			}
+		  });
+		  window.setInterval(function(){
+			if(webSocket != null && webSocket.readyState == WebSocket.OPEN) {
+			  webSocket.send("P");
+			}
+		  }, 1000);
+		});
+	</script>
+  </head>
+  <body>
+	<main>
+		<h1>Safety Configuration</h1>
+		<form action="/submit" method="post">
+			<div class="tab-wrap">
+			  <input type="radio" id="tab1" name="tabGroup1" class="tab" checked>
+			  <label for="tab1">Device 1</label>
+			  <input type="radio" id="tab2" name="tabGroup1" class="tab">
+			  <label for="tab2">Device 2</label>
+			  <input type="radio" id="tab3" name="tabGroup1" class="tab">
+			  <label for="tab3">Device 3</label>
+			  <input type="radio" id="tab4" name="tabGroup1" class="tab">
+			  <label for="tab4">Security</label>
+			  <input type="radio" id="tab5" name="tabGroup1" class="tab">
+			  <label for="tab5">Control</label>
+			  <div class="tab__content">  
+				<div>
+				  <label for="device_id0">Device ID:</label>
+				  <input type="number" id="device_id0" name="device_id0" min="0" max="65535" value="%Device0.DeviceId%"><br/>
+				</div>
+				<fieldset>
+				<legend>Enabled Features</legend>
+				<input type="checkbox" id="feature_beep0" name="feature_beep0" %Device0.BeepEnabled%>
+				<label for="feature_beep0">Beep</label><br/>
+				<input type="checkbox" id="feature_vibrate0" name="feature_vibrate0" %Device0.VibrateEnabled%>
+				<label for="feature_vibrate0">Vibrate</label><br/>
+				<input type="checkbox" id="feature_shock0" name="feature_shock0" %Device0.ShockEnabled%>
+				<label for="feature_shock0">Shock</label><br/>
+				</fieldset>
+				<br>
+				<fieldset class="flex-column flex-end">
+				<legend>Maximum Intensity Settings</legend>
+				<div>
+				  <label for="shock_max_intensity0">Max Shock Intensity:</label>
+				  <input type="number" id="shock_max_intensity0" name="shock_max_intensity0" min="1" max="100" value="%Device0.ShockIntensity%"><br/>
+				</div>
+				<div>
+				  <label for="shock_max_duration0">Max Shock Duration:</label>
+				  <input type="number" id="shock_max_duration0" name="shock_max_duration0" min="1" max="10" value="%Device0.ShockDuration%"><br/>
+				</div>
+				<div>
+				  <label for="shock_interval0">Shock Interval:</label>
+				  <input type="number" id="shock_interval0" name="shock_interval0" min="1" max="10" value="%Device0.ShockInterval%"><br/>
+				</div>
+				<div>
+				  <label for="vibrate_max_intensity0">Max Vibrate Intensity:</label>
+				  <input type="number" id="vibrate_max_intensity0" name="vibrate_max_intensity0" min="1" max="100" value="%Device0.VibrateIntensity%"><br/>
+				</div>
+				<div>
+				  <label for="vibrate_max_duration0">Max Vibrate Duration:</label>
+				  <input type="number" id="vibrate_max_duration0" name="vibrate_max_duration0" min="1" max="10" value="%Device0.VibrateDuration%"><br/>
+				</div>
+				</fieldset>
+			  </div>
+			  <div class="tab__content">
+				<div>
+				  <label for="device_id1">Device ID:</label>
+				  <input type="number" id="device_id1" name="device_id1" min="0" max="65535" value="%Device1.DeviceId%"><br/>
+				</div>
+				<fieldset>
+				<legend>Enabled Features</legend>
+				<input type="checkbox" id="feature_beep1" name="feature_beep1" %Device1.BeepEnabled%>
+				<label for="feature_beep1">Beep</label><br/>
+				<input type="checkbox" id="feature_vibrate1" name="feature_vibrate1" %Device1.VibrateEnabled%>
+				<label for="feature_vibrate1">Vibrate</label><br/>
+				<input type="checkbox" id="feature_shock1" name="feature_shock1" %Device1.ShockEnabled%>
+				<label for="feature_shock1">Shock</label><br/>
+				</fieldset>
+				<br>
+				<fieldset class="flex-column flex-end">
+				<legend>Maximum Intensity Settings</legend>
+				<div>
+				  <label for="shock_max_intensity1">Max Shock Intensity:</label>
+				  <input type="number" id="shock_max_intensity1" name="shock_max_intensity1" min="1" max="100" value="%Device1.ShockIntensity%"><br/>
+				</div>
+				<div>
+				  <label for="shock_max_duration1">Max Shock Duration:</label>
+				  <input type="number" id="shock_max_duration1" name="shock_max_duration1" min="1" max="10" value="%Device1.ShockDuration%"><br/>
+				</div>
+				<div>
+				  <label for="shock_interval1">Shock Interval:</label>
+				  <input type="number" id="shock_interval1" name="shock_interval1" min="1" max="10" value="%Device1.ShockInterval%"><br/>
+				</div>
+				<div>
+				  <label for="vibrate_max_intensity1">Max Vibrate Intensity:</label>
+				  <input type="number" id="vibrate_max_intensity1" name="vibrate_max_intensity1" min="1" max="100" value="%Device1.VibrateIntensity%"><br/>
+				</div>
+				<div>
+				  <label for="vibrate_max_duration1">Max Vibrate Duration:</label>
+				  <input type="number" id="vibrate_max_duration1" name="vibrate_max_duration1" min="1" max="10" value="%Device1.VibrateDuration%"><br/>
+				</div>
+				</fieldset>
+			  </div>
+			  <div class="tab__content">
+				<div>
+				  <label for="device_id2">Device ID:</label>
+				  <input type="number" id="device_id2" name="device_id2" min="0" max="65535" value="%Device2.DeviceId%"><br/>
+				</div>
+				<fieldset>
+				<legend>Enabled Features</legend>
+				<input type="checkbox" id="feature_beep2" name="feature_beep2" %Device2.BeepEnabled%>
+				<label for="feature_beep2">Beep</label><br/>
+				<input type="checkbox" id="feature_vibrate2" name="feature_vibrate2" %Device2.VibrateEnabled%>
+				<label for="feature_vibrate2">Vibrate</label><br/>
+				<input type="checkbox" id="feature_shock2" name="feature_shock2" %Device2.ShockEnabled%>
+				<label for="feature_shock2">Shock</label><br/>
+				</fieldset>
+				<br>
+				<fieldset class="flex-column flex-end">
+				<legend>Maximum Intensity Settings</legend>
+				<div>
+				  <label for="shock_max_intensity2">Max Shock Intensity:</label>
+				  <input type="number" id="shock_max_intensity2" name="shock_max_intensity2" min="1" max="100" value="%Device2.ShockIntensity%"><br/>
+				</div>
+				<div>
+				  <label for="shock_max_duration2">Max Shock Duration:</label>
+				  <input type="number" id="shock_max_duration2" name="shock_max_duration2" min="1" max="10" value="%Device2.ShockDuration%"><br/>
+				</div>
+				<div>
+				  <label for="shock_interval2">Shock Interval:</label>
+				  <input type="number" id="shock_interval2" name="shock_interval2" min="1" max="10" value="%Device2.ShockInterval%"><br/>
+				</div>
+				<div>
+				  <label for="vibrate_max_intensity2">Max Vibrate Intensity:</label>
+				  <input type="number" id="vibrate_max_intensity2" name="vibrate_max_intensity2" min="1" max="100" value="%Device2.VibrateIntensity%"><br/>
+				</div>
+				<div>
+				  <label for="vibrate_max_duration2">Max Vibrate Duration:</label>
+				  <input type="number" id="vibrate_max_duration2" name="vibrate_max_duration2" min="1" max="10" value="%Device2.VibrateDuration%"><br/>
+				</div>
+				</fieldset>
+			  </div>
+			  <div class="tab__content">
+				<input type="checkbox" id="require_device_id" name="require_device_id" title="Require DeviceID to be part of the local websocket URI" %RequireDeviceId%>
+				<label for="require_device_id">Require device ID for local control</label><br/>
+				<input type="checkbox" id="allow_remote_access" name="allow_remote_access" title="Allow this device to be controlled via shockies.dev" %AllowRemoteAccess%>
+				<label for="allow_remote_access">Allow Remote Access</label><br/>
+				<div class="flex-column flex-center">
+				<a href="http://shockies.local/update">Update Firmware</a>
+				</div>
+				
+			  </div>
+			  <div class="tab__content">
+				<fieldset>
+				  <legend>Mode</legend>
+				  <input type="radio" id="mode_beep" name="mode" value="B">
+				  <label for="mode_beep">Beep</label><br/>
+				  <input type="radio" id="mode_vibrate" name="mode" value="V" checked >
+				  <label for="mode_vibrate">Vibrate</label><br/>
+				  <input type="radio" id="mode_shock" name="mode" value="S">
+				  <label for="mode_shock">Shock</label><br/>
+				</fieldset>
+				<label for="intensity">Intensity:</label>
+				<input type="number" id="intensity" name="intensity" min="0" max="100" value="10" >
+				<input id="sendButton" class="button" type="button" Value="Send" disabled />
+			  </div>
+			</div>
+			<input type="hidden" name="configure_features" value="true"/>
+			<input class="button" type="submit" value="Save"/>
+		</form>
+		<pre>ws://shockies.local/websocket/%DeviceId%</pre>
+		<pre>Shockies Version %VersionString%</pre>
+	</main>  
+  </body>
+</html>
