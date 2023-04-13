@@ -115,7 +115,8 @@ void setup()
   }
   
   
-  currentProtocol = { 125, {  6, 5 }, {  2,  6 }, {  2,  12 }};
+  //currentProtocol = { 125, {  6, 5 }, {  2,  6 }, {  2,  12 }};
+  currentProtocol = { 125, {  11, 6 }, {  2, 6 }, {  6,  2 }};
 
   webSocket = new AsyncWebSocket("/websocket/");
   webSocketId = new AsyncWebSocket("/websocket/" + String(settings.DeviceId));
@@ -229,17 +230,23 @@ void SendPacket(uint16_t id, CommandFlag commandFlag, uint8_t strength)
    * until it beeps, and then send a command with the
    * desired Channel ID and Collar ID
    */
-  
+
   unsigned long long data = 0LL;
-  data |= (((unsigned long long) ((uint8_t)commandFlag | 0x80)) << 32);
-  data |= (((unsigned long long) id) << 16);
+  data |= (((unsigned long long)id) << 24);
+  data |= (((unsigned long long) (uint8_t)commandFlag) << 16);
   data |= (((unsigned long long) strength) << 8);
-  data |= reverse(((uint8_t)commandFlag | 0x80) ^ 0xFF);
+  data |= ((data & 0xFF00) >> 8) + ((data & 0xFF0000) >> 16) +((data & 0xFF000000) >> 24) + +((data & 0xFF00000000) >> 32);
+  
+  data <<= 3; //Shift for padding.
+  //data |= (((unsigned long long) ((uint8_t)commandFlag | 0x80)) << 32);
+  //data |= (((unsigned long long) id) << 16);
+  //data |= (((unsigned long long) strength) << 8);
+  //data |= reverse(((uint8_t)commandFlag | 0x80) ^ 0xFF);
   
   for (uint8_t repeat = 0; repeat < 2; repeat++)
   {
     TransmitPulse(currentProtocol.Sync);
-    for (int8_t i = 39; i >= 0; i--)
+    for (int8_t i = 42; i >= 0; i--)
     {
       if (data & (1LL << i))
         TransmitPulse(currentProtocol.One);
