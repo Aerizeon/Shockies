@@ -3,8 +3,8 @@
 #include <ESPAsyncWebServer.h>
 
 #define UUID_STR_LEN 37
-#define SHOCKIES_SETTINGS_VERSION 4
-#define SHOCKIES_VERSION "1.2.0"
+#define SHOCKIES_SETTINGS_VERSION 6
+#define SHOCKIES_VERSION "1.3.0"
 
 typedef uint8_t uuid_t[16];
 
@@ -38,8 +38,15 @@ enum class CommandFlag : uint8_t
   Invalid = 0b11111111
 };
 
+enum class DeviceType : uint8_t
+{
+  Petrainer  = 0, // The Petrainer 998DR. This was commonly used with first generation pishock devices.
+  Funtrainer = 1  // FunniPets FunTrainer (Patent zl201730008120.0). This can also be found on aliexpress as a generic. Commonly used with second generation pishock devices.
+};
+
 struct DeviceSettings
 {
+  DeviceType Type = DeviceType::Petrainer;
    /// Determines which features are enabled
   CommandFlag Features = CommandFlag::None;
   /// The ID for this collar
@@ -56,6 +63,7 @@ struct DeviceSettings
   uint8_t VibrateDuration = 0;
   /// Device name for webpage display
   char Name[32];
+  
     
   /**
    * Enable the specified feature(s)
@@ -148,10 +156,10 @@ CommandState lastCommand;
  */
 struct Pulse
 {
-  /// Length of high pulse, in PulseLength intervals
-  uint8_t High;
-  /// Length of low pulse, in PulseLength intervals
-  uint8_t Low;
+  /// Length of high pulse, in microseconds
+  uint16_t High;
+  /// Length of low pulse, in microseconds
+  uint16_t Low;
 };
 
 /**
@@ -159,16 +167,47 @@ struct Pulse
  */
 struct Protocol
 {
-  /// Length of pulse, in microseconds.
-  uint16_t PulseLength;
   /// Pulse specifications for the Sync code
   Pulse Sync;
   /// Pulse specifications for the Zero code
   Pulse Zero;
   /// Pulse Specifications for the One code
   Pulse One;
-} currentProtocol;
+};
 
+struct DeviceProperties
+{
+  CommandFlag Features = CommandFlag::All;
+  Protocol DeviceProtocol;
+  uint8_t Commands[4];
+
+  uint8_t MapCommand(CommandFlag currentCommand)
+  {
+    switch(currentCommand)
+    {
+      case CommandFlag::Light:
+        return Commands[0];
+      case CommandFlag::Beep:
+        return Commands[1];
+      case CommandFlag::Vibrate:
+        return Commands[2];
+      case CommandFlag::Shock:
+        return Commands[3];
+      default:
+        return 0;
+    }
+  }
+  /**
+   * Checks if a given feature is supported
+   * 
+   * @param feature The feature to check against currently enabled features
+   * @return 'True' if this feature is enabled, 'False' if not.
+   */
+  bool FeatureSupported(CommandFlag feature)
+  {
+    return (static_cast<uint8_t>(Features) & static_cast<uint8_t>(feature)) == static_cast<uint8_t>(feature);
+  }
+} SupportedDevices[2];
 
 
 /**

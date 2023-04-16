@@ -7,6 +7,7 @@
 #include <EEPROM.h>
 #include <SPIFFS.h>
 #include <Update.h>
+#include <esp32-hal.h>
 
 AsyncWebServer webServer(80);
 AsyncWebSocket *webSocket;
@@ -14,7 +15,7 @@ AsyncWebSocket *webSocketId;
 DNSServer dnsServer;
  
 void setup()
-{
+{ 
   int wifiConnectTime = 0;
   Serial.begin(9600);
   Serial.setDebugOutput(true);
@@ -30,11 +31,22 @@ void setup()
   EEPROM.begin(sizeof(settings));
   EEPROM.get(0, settings);
 
+  SupportedDevices[0].Commands[0] = 0b00001000;
+  SupportedDevices[0].Commands[1] = 0b00000100;
+  SupportedDevices[0].Commands[2] = 0b00000010;
+  SupportedDevices[0].Commands[3] = 0b00000001;
+  
+  SupportedDevices[1].Commands[0] = 0b00000100;
+  SupportedDevices[1].Commands[1] = 0b00001000;
+  SupportedDevices[1].Commands[2] = 0b00000010;
+  SupportedDevices[1].Commands[3] = 0b00000001;
+
   if(settings.SettingsVersion != SHOCKIES_SETTINGS_VERSION){
     for(int dev = 0; dev < 3; dev++)
     {
       if(dev == 0)
       {
+        settings.Devices[dev].Type = DeviceType::Petrainer;
         settings.Devices[dev].Features = CommandFlag::All;
         settings.Devices[dev].ShockIntensity = 30;
         settings.Devices[dev].ShockDuration = 5;
@@ -46,6 +58,7 @@ void setup()
       }
       else
       {
+        settings.Devices[dev].Type = DeviceType::Petrainer;
         settings.Devices[dev].Features = CommandFlag::None;
         settings.Devices[dev].ShockIntensity = 1;
         settings.Devices[dev].ShockDuration = 1;
@@ -115,9 +128,6 @@ void setup()
   }
   
   
-  //currentProtocol = { 125, {  6, 5 }, {  2,  6 }, {  2,  12 }};
-  currentProtocol = { 125, {  11, 6 }, {  2, 6 }, {  6,  2 }};
-
   webSocket = new AsyncWebSocket("/websocket/");
   webSocketId = new AsyncWebSocket("/websocket/" + String(settings.DeviceId));
   webSocket->onEvent(WS_HandleEvent);
@@ -189,19 +199,20 @@ void loop()
     return;
 
   // Transmit the current command to the collar
-  SendPacket(settings.Devices[currentCommand.DeviceIndex].DeviceId, currentCommand.Command, currentCommand.Intensity);
+
+  SendPacket(settings.Devices[currentCommand.DeviceIndex].Type, settings.Devices[currentCommand.DeviceIndex].DeviceId, currentCommand.Command, currentCommand.Intensity);
 
 }
 
 inline void TransmitPulse(Pulse pulse)
 {
   digitalWrite(4, HIGH);
-  delayMicroseconds(currentProtocol.PulseLength * pulse.High);
+  delayMicroseconds(pulse.High);
   digitalWrite(4, LOW);
-  delayMicroseconds(currentProtocol.PulseLength * pulse.Low);
+  delayMicroseconds(pulse.Low);
 }
 
-void SendPacket(uint16_t id, CommandFlag commandFlag, uint8_t strength)
+void SendPacket(DeviceType deviceType, uint16_t id, CommandFlag commandFlag, uint8_t strength)
 {
   //N = Channel ID (1 or 2)
   //C = Command
@@ -214,8 +225,6 @@ void SendPacket(uint16_t id, CommandFlag commandFlag, uint8_t strength)
   //10000010 00000010 00000011 01100100 10111110 1V100
   //10000100 00000010 00000011 00000000 11011110 1B000
   //10001000 00010010 10101111 00000000 11101110 1F000
-  //11111000 00010010 10101111 00000000 11100000
-  
   //11111000 00010010 10101111 00000000 11100000 2F000
   //Channel 1 = 0b1000
   //Channel 2 = 0b1111
@@ -226,27 +235,37 @@ void SendPacket(uint16_t id, CommandFlag commandFlag, uint8_t strength)
    * channel, and any ID number - so we don't bother
    * providing a configuration option for it here.
    * 
-   * To reprogram a PET998DR, long-press the power button
+   * To reprogram a collar, long-press the power button
    * until it beeps, and then send a command with the
    * desired Channel ID and Collar ID
    */
 
   unsigned long long data = 0LL;
-  data |= (((unsigned long long)id) << 24);
-  data |= (((unsigned long long) (uint8_t)commandFlag) << 16);
-  data |= (((unsigned long long) strength) << 8);
-  data |= ((data & 0xFF00) >> 8) + ((data & 0xFF0000) >> 16) +((data & 0xFF000000) >> 24) + +((data & 0xFF00000000) >> 32);
-  
-  data <<= 3; //Shift for padding.
-  //data |= (((unsigned long long) ((uint8_t)commandFlag | 0x80)) << 32);
-  //data |= (((unsigned long long) id) << 16);
-  //data |= (((unsigned long long) strength) << 8);
-  //data |= reverse(((uint8_t)commandFlag | 0x80) ^ 0xFF);
-  
+  unsigned short dataBits = 39;
+  Protocol currentProtocol;
+  if(deviceType == DeviceType::Petrainer)
+  {
+      data |= (((unsigned long long) (SupportedDevices[0].MapCommand(commandFlag) | 0x80)) << 32);
+      data |= (((unsigned long long) id) << 16);
+      data |= (((unsigned long long) strength) << 8);
+      data |= reverse(((uint8_t)commandFlag | 0x80) ^ 0xFF);
+      dataBits = 39;
+      currentProtocol = {{750, 625}, {250, 750}, {250, 1500}};
+  }
+  else if(deviceType == DeviceType::Funtrainer)
+  {
+    data |= (((unsigned long long)id) << 24);
+    data |= (((unsigned long long) SupportedDevices[1].MapCommand(commandFlag)) << 16);
+    data |= (((unsigned long long) strength) << 8);
+    data |= ((data & 0xFF00) >> 8) + ((data & 0xFF0000) >> 16) + ((data & 0xFF000000) >> 24) + ((data & 0xFF00000000) >> 32);
+    data <<= 3; //Shift for padding.
+    dataBits = 42;
+    currentProtocol = {{1375,810}, {290, 800}, {775, 325}};
+  }
   for (uint8_t repeat = 0; repeat < 2; repeat++)
   {
     TransmitPulse(currentProtocol.Sync);
-    for (int8_t i = 42; i >= 0; i--)
+    for (int8_t i = dataBits; i >= 0; i--)
     {
       if (data & (1LL << i))
         TransmitPulse(currentProtocol.One);
@@ -254,6 +273,7 @@ void SendPacket(uint16_t id, CommandFlag commandFlag, uint8_t strength)
         TransmitPulse(currentProtocol.Zero);
     }
   }
+  
 }
 
 String templateProcessor(const String& var)
@@ -272,6 +292,8 @@ String templateProcessor(const String& var)
     return SHOCKIES_VERSION;
 
   // Device 0
+  else if(var == "Device0.DeviceType")
+    return String(static_cast<uint8_t>(settings.Devices[0].Type));
   else if(var == "Device0.DeviceId")
     return String(settings.Devices[0].DeviceId);
   else if(var == "Device0.BeepEnabled")
@@ -292,6 +314,8 @@ String templateProcessor(const String& var)
     return String(settings.Devices[0].VibrateDuration);
   
   //Device 1
+  else if(var == "Device1.DeviceType")
+    return String(static_cast<uint8_t>(settings.Devices[1].Type));
   else if(var == "Device1.DeviceId")
     return String(settings.Devices[1].DeviceId);
   else if(var == "Device1.BeepEnabled")
@@ -312,6 +336,8 @@ String templateProcessor(const String& var)
     return String(settings.Devices[1].VibrateDuration);
 
   //Device 2
+  else if(var == "Device2.DeviceType")
+    return String(static_cast<uint8_t>(settings.Devices[2].Type));
   else if(var == "Device2.DeviceId")
     return String(settings.Devices[2].DeviceId);
   else if(var == "Device2.BeepEnabled")
@@ -378,6 +404,8 @@ void HTTP_POST_Submit(AsyncWebServerRequest *request)
         settings.Devices[devId].EnableFeature(CommandFlag::Shock);
       if(request->hasParam("device_id" + String(devId), true))
         settings.Devices[devId].DeviceId = request->getParam("device_id" + String(devId), true)->value().toInt();
+      if(request->hasParam("device_type" + String(devId), true))
+        settings.Devices[devId].Type = (DeviceType)request->getParam("device_type" + String(devId), true)->value().toInt();
       if(request->hasParam("shock_max_intensity" + String(devId), true))
         settings.Devices[devId].ShockIntensity = request->getParam("shock_max_intensity" + String(devId), true)->value().toInt();
       if(request->hasParam("shock_max_duration" + String(devId), true))
@@ -544,8 +572,15 @@ void WS_HandleEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsE
               if(id > 3)
                 return;
 
-              //Beep - Intensity is not used.
-              if(*command == 'B' && settings.Devices[id].FeatureEnabled(CommandFlag::Beep))
+              //Light
+              if(*command == 'L' && settings.Devices[id].FeatureEnabled(CommandFlag::Light))
+              {
+                currentCommand.Set(id, CommandFlag::Light, intensity);
+                client->text("OK: L");
+                break;
+              }
+              //Beep
+              else if(*command == 'B' && settings.Devices[id].FeatureEnabled(CommandFlag::Beep))
               {
                 currentCommand.Set(id, CommandFlag::Beep, intensity);
                 client->text("OK: B");
