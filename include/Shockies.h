@@ -220,11 +220,12 @@ void TransmitPulse(Pulse pulse);
 /**
  * Transmits a packet using 433.9Mhz ASK/OOK Transmitter connected to Pin 4
  *  
+ * @param deviceType Type of device receiving this command
  * @param id Collar ID Code that will be transmitted
  * @param commandFlag Bitflags. Type of command (or commands) to be sent to the collar
  * @param strength Strength of Vibrate or Shock command (0 - 100)
  */
-void SendPacket(uint16_t id, CommandFlag commandFlag, uint8_t strength);
+void SendPacket(DeviceType deviceType, uint16_t id, CommandFlag commandFlag, uint8_t strength);
 
 /// Task loop for WebServer, WebSockets and DNS handlers.
 void WebHandlerTask(void* parameter);
