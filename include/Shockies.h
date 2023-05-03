@@ -1,9 +1,17 @@
 #ifndef _Shockies_h
 #define _Shockies_h
 #include <ESPAsyncWebServer.h>
+#include <Devices.h>
+#include <Transmit.h>
+#include <mutex>
+
+using std::vector;
+using std::shared_ptr;
+using std::unique_ptr;
+using std::mutex;
 
 #define UUID_STR_LEN 37
-#define SHOCKIES_SETTINGS_VERSION 6
+#define SHOCKIES_SETTINGS_VERSION 8
 #define SHOCKIES_VERSION "1.3.0"
 
 typedef uint8_t uuid_t[16];
@@ -23,69 +31,9 @@ uint32_t lastWatchdogTime = 0;
 /// Last time an update check was performed
 uint32_t lastUpdateCheck = 0;
 
-/// Lookup Table for Byte Reversal code
-static unsigned char reverseLookup[16] = { 0x0, 0x8, 0x4, 0xc, 0x2, 0xa, 0x6, 0xe, 0x1, 0x9, 0x5, 0xd, 0x3, 0xb, 0x7, 0xf, };
-
-/// BitFlags for commands that can be sent to the collar, or enabled as features.
-enum class CommandFlag : uint8_t
-{
-  None    = 0b00000000,
-  Shock   = 0b00000001,
-  Vibrate = 0b00000010,
-  Beep    = 0b00000100,
-  Light   = 0b00001000,
-  All     = 0b00001111,
-  Invalid = 0b11111111
-};
-
-enum class DeviceType : uint8_t
-{
-  Petrainer  = 0, // The Petrainer 998DR. This was commonly used with first generation pishock devices.
-  Funtrainer = 1  // FunniPets FunTrainer (Patent zl201730008120.0). This can also be found on aliexpress as a generic. Commonly used with second generation pishock devices.
-};
-
-struct DeviceSettings
-{
-  DeviceType Type = DeviceType::Petrainer;
-   /// Determines which features are enabled
-  CommandFlag Features = CommandFlag::None;
-  /// The ID for this collar
-  uint16_t DeviceId = 65535;
-  /// Determines max shock strength (0 - 100)
-  uint8_t ShockIntensity = 0;
-  /// Determines how long a single shock command can last
-  uint8_t ShockDuration = 0;
-  ///Determines how long to wait between shocks of maximum length
-  uint8_t ShockInterval = 0;
-  /// Determines max vibrate strength (0 - 100)
-  uint8_t VibrateIntensity = 0;
-  /// Determines how long a single vibrate command can last
-  uint8_t VibrateDuration = 0;
-  /// Device name for webpage display
-  char Name[32];
-  
-    
-  /**
-   * Enable the specified feature(s)
-   * 
-   * @param feature Which features to enable
-   */
-  void EnableFeature(CommandFlag feature)
-  {
-    Features = static_cast<CommandFlag>(static_cast<uint8_t>(Features) | static_cast<uint8_t>(feature));
-  }
-
-  /**
-   * Checks if a given feature is enabled
-   * 
-   * @param feature The feature to check against currently enabled features
-   * @return 'True' if this feature is enabled, 'False' if not.
-   */
-  bool FeatureEnabled(CommandFlag feature)
-  {
-    return (static_cast<uint8_t>(Features) & static_cast<uint8_t>(feature)) == static_cast<uint8_t>(feature);
-  }
-};
+mutex DevicesMutex;
+vector<unique_ptr<Device>> Devices;
+shared_ptr<Transmitter> DeviceTransmitter;
 
 /**
  * Stored EEPROM Settings
@@ -104,128 +52,8 @@ struct EEPROM_Settings
   /// Allow the device to be controlled from shockies.dev (not yet implemented - TODO)
   bool AllowRemoteAccess = false;
   /// Allow up to 3 devices to be configured
-  DeviceSettings Devices[3];
-} settings;
-
-/**
- * Command Attributes
- */
-struct CommandState
-{
-  /// DeviceId
-  uint32_t DeviceIndex = 0;
-  /// Current command
-  CommandFlag Command = CommandFlag::None;
-  /// Current intensity
-  uint8_t Intensity = 0;
-  /// Time command was issued
-  uint32_t StartTime = 0;
-  uint32_t EndTime = 0;
-
-  /// Reset all attributes on this CommandState
-  void Reset()
-  {
-    DeviceIndex = 0;
-    Command = CommandFlag::None;
-    Intensity = 0;
-    StartTime = 0;
-    EndTime = 0;
-  }
-
-  /**
-   * Set all attributes on this CommandState
-   * 
-   * @param collarId Target collar ID
-   * @param commandFlag CommandFlag containing the desired command(s) 
-   * @param intensity Strength of the Vibration or Shock command (0 - 100)
-   */
-  void Set(uint32_t deviceIndex, CommandFlag commandFlag, uint8_t intensity)
-  {
-    DeviceIndex = deviceIndex;
-    Intensity  = min(intensity, commandFlag == CommandFlag::Shock ? settings.Devices[DeviceIndex].ShockIntensity : settings.Devices[DeviceIndex].VibrateIntensity);
-    StartTime = millis();
-    lastWatchdogTime = StartTime;
-    Command = commandFlag;
-  }
-} currentCommand;
-
-CommandState lastCommand;
-
-/**
- * Pulse specification for individual OOK/ASK codes
- */
-struct Pulse
-{
-  /// Length of high pulse, in microseconds
-  uint16_t High;
-  /// Length of low pulse, in microseconds
-  uint16_t Low;
-};
-
-/**
- * OOK/ASK Protocol Specifications
- */
-struct Protocol
-{
-  /// Pulse specifications for the Sync code
-  Pulse Sync;
-  /// Pulse specifications for the Zero code
-  Pulse Zero;
-  /// Pulse Specifications for the One code
-  Pulse One;
-};
-
-struct DeviceProperties
-{
-  CommandFlag Features = CommandFlag::All;
-  Protocol DeviceProtocol;
-  uint8_t Commands[4];
-
-  uint8_t MapCommand(CommandFlag currentCommand)
-  {
-    switch(currentCommand)
-    {
-      case CommandFlag::Light:
-        return Commands[0];
-      case CommandFlag::Beep:
-        return Commands[1];
-      case CommandFlag::Vibrate:
-        return Commands[2];
-      case CommandFlag::Shock:
-        return Commands[3];
-      default:
-        return 0;
-    }
-  }
-  /**
-   * Checks if a given feature is supported
-   * 
-   * @param feature The feature to check against currently enabled features
-   * @return 'True' if this feature is enabled, 'False' if not.
-   */
-  bool FeatureSupported(CommandFlag feature)
-  {
-    return (static_cast<uint8_t>(Features) & static_cast<uint8_t>(feature)) == static_cast<uint8_t>(feature);
-  }
-} SupportedDevices[2];
-
-
-/**
- * Transmits an individual OOK pulse based on the specified protocol
- * 
- * @param pulse Pulse length specification for this pulse
- */
-void TransmitPulse(Pulse pulse);
-
-/**
- * Transmits a packet using 433.9Mhz ASK/OOK Transmitter connected to Pin 4
- *  
- * @param deviceType Type of device receiving this command
- * @param id Collar ID Code that will be transmitted
- * @param commandFlag Bitflags. Type of command (or commands) to be sent to the collar
- * @param strength Strength of Vibrate or Shock command (0 - 100)
- */
-void SendPacket(DeviceType deviceType, uint16_t id, CommandFlag commandFlag, uint8_t strength);
+  Settings Devices[3];
+} EEPROMData;
 
 /// Task loop for WebServer, WebSockets and DNS handlers.
 void WebHandlerTask(void* parameter);
@@ -250,16 +78,7 @@ void WS_HandleEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEve
 
 void WS_SendConfig();
 
-
-/**
- * Reverse the bits in an unsigned byte
- * 
- * @param n Unsigned byte to be reversed.
- */
-inline uint8_t reverse(uint8_t n) {
-   // Reverse the top and bottom nibble then swap them.
-   return (reverseLookup[n&0b1111] << 4) | reverseLookup[n>>4];
-}
+void UpdateDevices();
 
 /**
  * Generate a UUID

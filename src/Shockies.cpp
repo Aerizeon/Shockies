@@ -8,100 +8,78 @@
 #include <SPIFFS.h>
 #include <Update.h>
 #include <esp32-hal.h>
+#include <memory>
 
 AsyncWebServer webServer(80);
 AsyncWebSocket *webSocket;
 AsyncWebSocket *webSocketId;
 DNSServer dnsServer;
- 
+
 void setup()
-{ 
+{
   int wifiConnectTime = 0;
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.setDebugOutput(true);
   Serial.println();
   Serial.println("Device is booting...");
 
-  if(!SPIFFS.begin(true))
+  if (!SPIFFS.begin(true))
   {
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
   }
 
-  EEPROM.begin(sizeof(settings));
-  EEPROM.get(0, settings);
+  EEPROM.begin(sizeof(EEPROMData));
+  EEPROM.get(0, EEPROMData);
 
-  SupportedDevices[0].Commands[0] = 0b00001000;
-  SupportedDevices[0].Commands[1] = 0b00000100;
-  SupportedDevices[0].Commands[2] = 0b00000010;
-  SupportedDevices[0].Commands[3] = 0b00000001;
-  
-  SupportedDevices[1].Commands[0] = 0b00000100;
-  SupportedDevices[1].Commands[1] = 0b00001000;
-  SupportedDevices[1].Commands[2] = 0b00000010;
-  SupportedDevices[1].Commands[3] = 0b00000001;
-
-  if(settings.SettingsVersion != SHOCKIES_SETTINGS_VERSION){
-    for(int dev = 0; dev < 3; dev++)
+  if (EEPROMData.SettingsVersion != SHOCKIES_SETTINGS_VERSION)
+  {
+    for (int dev = 0; dev < 3; dev++)
     {
-      if(dev == 0)
-      {
-        settings.Devices[dev].Type = DeviceType::Petrainer;
-        settings.Devices[dev].Features = CommandFlag::All;
-        settings.Devices[dev].ShockIntensity = 30;
-        settings.Devices[dev].ShockDuration = 5;
-        settings.Devices[dev].ShockInterval = 5;
-        settings.Devices[dev].VibrateIntensity = 50;
-        settings.Devices[dev].VibrateDuration = 5;
-        settings.Devices[dev].DeviceId = (uint16_t)(esp_random() % 65536);
-        sprintf(settings.Devices[dev].Name, "Device %u", dev + 1);
-      }
-      else
-      {
-        settings.Devices[dev].Type = DeviceType::Petrainer;
-        settings.Devices[dev].Features = CommandFlag::None;
-        settings.Devices[dev].ShockIntensity = 1;
-        settings.Devices[dev].ShockDuration = 1;
-        settings.Devices[dev].ShockInterval = 1;
-        settings.Devices[dev].VibrateIntensity = 1;
-        settings.Devices[dev].VibrateDuration = 1;
-        settings.Devices[dev].DeviceId = (uint16_t)(esp_random() % 65536);
-        sprintf(settings.Devices[dev].Name, "Device %u", dev + 1);
-      }
+      EEPROMData.Devices[dev].Type = Model::Petrainer;
+      EEPROMData.Devices[dev].Features = Command::None;
+      EEPROMData.Devices[dev].ShockIntensity = 30;
+      EEPROMData.Devices[dev].ShockDuration = 5;
+      EEPROMData.Devices[dev].ShockInterval = 5;
+      EEPROMData.Devices[dev].VibrateIntensity = 50;
+      EEPROMData.Devices[dev].VibrateDuration = 5;
+      EEPROMData.Devices[dev].DeviceId = (uint16_t)(esp_random() % 65536);
     }
-    
-    memset(settings.WifiName, 0, 33);
-    memset(settings.WifiPassword, 0, 65);
-    memset(settings.DeviceId, 0, UUID_STR_LEN);
-    settings.RequireDeviceId = false;
-    settings.AllowRemoteAccess = false;
-    settings.SettingsVersion = SHOCKIES_SETTINGS_VERSION;
+
+    memset(EEPROMData.WifiName, 0, 33);
+    memset(EEPROMData.WifiPassword, 0, 65);
+    memset(EEPROMData.DeviceId, 0, UUID_STR_LEN);
+    EEPROMData.RequireDeviceId = false;
+    EEPROMData.AllowRemoteAccess = false;
+    EEPROMData.SettingsVersion = SHOCKIES_SETTINGS_VERSION;
     uuid_t deviceID;
     UUID_Generate(deviceID);
-    UUID_ToString(deviceID, settings.DeviceId);
-    EEPROM.put(0, settings);
+    UUID_ToString(deviceID, EEPROMData.DeviceId);
+    EEPROM.put(0, EEPROMData);
     EEPROM.commit();
   }
 
+  DeviceTransmitter = std::make_shared<Transmitter>();
+  UpdateDevices();
+
   pinMode(4, OUTPUT);
-  
-  if(strlen(settings.WifiName) > 0)
+
+  if (strlen(EEPROMData.WifiName) > 0)
   {
-    Serial.println("Connecting to Wi-Fi..."); 
-    Serial.printf("SSID: %s\n", settings.WifiName);
-    Serial.printf("Password: %s\n", settings.WifiPassword);
-    
+    Serial.println("Connecting to Wi-Fi...");
+    Serial.printf("SSID: %s\n", EEPROMData.WifiName);
+    Serial.printf("Password: %s\n", EEPROMData.WifiPassword);
+
     WiFi.mode(WIFI_STA);
-    WiFi.begin(settings.WifiName, settings.WifiPassword);
+    WiFi.begin(EEPROMData.WifiName, EEPROMData.WifiPassword);
     wifiConnectTime = millis();
-    while(WiFi.status() != WL_CONNECTED && millis() - wifiConnectTime < 10000)
+    while (WiFi.status() != WL_CONNECTED && millis() - wifiConnectTime < 10000)
     {
-      yield();
       delay(1000);
     }
   }
-  
-  if(WiFi.status() == WL_CONNECTED)
+
+  if (WiFi.status() == WL_CONNECTED)
   {
     Serial.println("Wi-Fi Connected!");
   }
@@ -109,10 +87,10 @@ void setup()
   {
     Serial.println("Failed to connect to Wi-Fi");
     Serial.println("Creating temporary Access Point for configuration...");
-    
+
     WiFi.mode(WIFI_AP);
 
-    if(WiFi.softAP("ShockiesConfig", "zappyzap"))
+    if (WiFi.softAP("ShockiesConfig", "zappyzap"))
     {
       Serial.println("Access Point created!");
       Serial.println("SSID: ShockiesConfig");
@@ -126,13 +104,12 @@ void setup()
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(53, "*", WiFi.softAPIP());
   }
-  
-  
+
   webSocket = new AsyncWebSocket("/websocket/");
-  webSocketId = new AsyncWebSocket("/websocket/" + String(settings.DeviceId));
+  webSocketId = new AsyncWebSocket("/websocket/" + String(EEPROMData.DeviceId));
   webSocket->onEvent(WS_HandleEvent);
   webSocketId->onEvent(WS_HandleEvent);
-  
+
   Serial.println("Starting HTTP Server on port 80...");
 
   // Main configuration page
@@ -150,23 +127,23 @@ void setup()
 
   webServer.begin();
   webServer.addHandler(webSocket);
-  webServer.addHandler(webSocketId);
-  
+  // webServer.addHandler(webSocketId);
+
   Serial.println("Starting mDNS...");
-  
+
   bool mDNSFailed = false;
-  
-  if(!MDNS.begin("shockies"))
+
+  if (!MDNS.begin("shockies"))
   {
     mDNSFailed = true;
     Serial.println("Error starting mDNS");
   }
 
   Serial.println("Connect to one of the following to configure settings:");
-  if(!mDNSFailed)
+  if (!mDNSFailed)
     Serial.println("http://shockies.local");
   Serial.print("http://");
-  if(WiFi.status() == WL_CONNECTED)
+  if (WiFi.status() == WL_CONNECTED)
     Serial.println(WiFi.localIP());
   else
     Serial.println(WiFi.softAPIP());
@@ -177,200 +154,85 @@ void loop()
   webSocket->cleanupClients();
   webSocketId->cleanupClients();
   dnsServer.processNextRequest();
-  if(rebootDevice)
+
+  if (rebootDevice)
   {
     delay(100);
     ESP.restart();
   }
 
-  uint32_t currentTime = millis();
-  uint32_t commandTimeout = ((currentCommand.Command == CommandFlag::Shock) ? settings.Devices[currentCommand.DeviceIndex].ShockDuration : settings.Devices[currentCommand.DeviceIndex].VibrateDuration) * 1000;
   // If E-Stop has been triggered
-  if(emergencyStop)
-    return;
-  // If we don't have a currently active command
-  if(currentCommand.Command == CommandFlag::None)
-    return;
-  // If the in-game controller hasn't responded in 1.5 seconds
-  if(currentTime - lastWatchdogTime > 1500)
-    return;
-  // If the current command has been executing for longer than the maximum duration
-  if(currentTime - currentCommand.StartTime > commandTimeout)
+  if (emergencyStop)
     return;
 
-  // Transmit the current command to the collar
-
-  SendPacket(settings.Devices[currentCommand.DeviceIndex].Type, settings.Devices[currentCommand.DeviceIndex].DeviceId, currentCommand.Command, currentCommand.Intensity);
-
+  std::lock_guard<std::mutex> guard(DevicesMutex);
+  for (auto &device : Devices)
+  {
+    device->TransmitCommand();
+  }
 }
 
-inline void TransmitPulse(Pulse pulse)
+String templateProcessor(const String &var)
 {
-  digitalWrite(4, HIGH);
-  delayMicroseconds(pulse.High);
-  digitalWrite(4, LOW);
-  delayMicroseconds(pulse.Low);
-}
 
-void SendPacket(DeviceType deviceType, uint16_t id, CommandFlag commandFlag, uint8_t strength)
-{
-  //N = Channel ID (1 or 2)
-  //C = Command
-  //I = Collar ID
-  //S = Strength
-  //R = Reverse(Command | UFlags) ^ 0xFF
-  
-  //NNNNCCCC IIIIIIII IIIIIIII SSSSSSSS RRRRRRRR
-  //10000001 00000010 00000011 01100100 01111110 1S100
-  //10000010 00000010 00000011 01100100 10111110 1V100
-  //10000100 00000010 00000011 00000000 11011110 1B000
-  //10001000 00010010 10101111 00000000 11101110 1F000
-  //11111000 00010010 10101111 00000000 11100000 2F000
-  //Channel 1 = 0b1000
-  //Channel 2 = 0b1111
-
-  /**
-   * Channel ID is fairly meaningless, since all collars
-   * can be reprogrammed to accept commands from either
-   * channel, and any ID number - so we don't bother
-   * providing a configuration option for it here.
-   * 
-   * To reprogram a collar, long-press the power button
-   * until it beeps, and then send a command with the
-   * desired Channel ID and Collar ID
-   */
-
-  unsigned long long data = 0LL;
-  unsigned short dataBits = 39;
-  Protocol currentProtocol;
-  if(deviceType == DeviceType::Petrainer)
-  {
-      data |= (((unsigned long long) (SupportedDevices[0].MapCommand(commandFlag) | 0x80)) << 32);
-      data |= (((unsigned long long) id) << 16);
-      data |= (((unsigned long long) strength) << 8);
-      data |= reverse(((uint8_t)commandFlag | 0x80) ^ 0xFF);
-      dataBits = 39;
-      currentProtocol = {{750, 625}, {250, 750}, {250, 1500}};
-  }
-  else if(deviceType == DeviceType::Funtrainer)
-  {
-    data |= (((unsigned long long)id) << 24);
-    data |= (((unsigned long long) SupportedDevices[1].MapCommand(commandFlag)) << 16);
-    data |= (((unsigned long long) strength) << 8);
-    data |= ((data & 0xFF00) >> 8) + ((data & 0xFF0000) >> 16) + ((data & 0xFF000000) >> 24) + ((data & 0xFF00000000) >> 32);
-    data <<= 3; //Shift for padding.
-    dataBits = 42;
-    currentProtocol = {{1375,810}, {290, 800}, {775, 325}};
-  }
-  for (uint8_t repeat = 0; repeat < 2; repeat++)
-  {
-    TransmitPulse(currentProtocol.Sync);
-    for (int8_t i = dataBits; i >= 0; i--)
-    {
-      if (data & (1LL << i))
-        TransmitPulse(currentProtocol.One);
-      else
-        TransmitPulse(currentProtocol.Zero);
-    }
-  }
-  
-}
-
-String templateProcessor(const String& var)
-{
-  if(var == "DeviceId")
-    return settings.RequireDeviceId ? String(settings.DeviceId) : "";
-  else if(var == "RequireDeviceId")
-    return settings.RequireDeviceId ? "checked" : "";
-  else if(var == "AllowRemoteAccess")
-    return settings.AllowRemoteAccess ? "checked" : "";
-  else if(var == "WifiName")
-    return settings.WifiName;
-  else if(var == "WifiPassword")
-    return settings.WifiPassword;
-  else if(var == "VersionString")
+  if (var == "DeviceId")
+    return EEPROMData.RequireDeviceId ? String(EEPROMData.DeviceId) : "";
+  else if (var == "RequireDeviceId")
+    return EEPROMData.RequireDeviceId ? "checked" : "";
+  else if (var == "AllowRemoteAccess")
+    return EEPROMData.AllowRemoteAccess ? "checked" : "";
+  else if (var == "WifiName")
+    return EEPROMData.WifiName;
+  else if (var == "WifiPassword")
+    return EEPROMData.WifiPassword;
+  else if (var == "VersionString")
     return SHOCKIES_VERSION;
 
-  // Device 0
-  else if(var == "Device0.DeviceType")
-    return String(static_cast<uint8_t>(settings.Devices[0].Type));
-  else if(var == "Device0.DeviceId")
-    return String(settings.Devices[0].DeviceId);
-  else if(var == "Device0.BeepEnabled")
-    return settings.Devices[0].FeatureEnabled(CommandFlag::Beep) ? "checked" : "";
-  else if(var == "Device0.VibrateEnabled")
-    return settings.Devices[0].FeatureEnabled(CommandFlag::Vibrate) ? "checked" : "";
-  else if(var == "Device0.ShockEnabled")
-    return settings.Devices[0].FeatureEnabled(CommandFlag::Shock) ? "checked" : "";
-  else if(var == "Device0.ShockIntensity")
-    return String(settings.Devices[0].ShockIntensity);
-  else if(var == "Device0.ShockDuration")
-    return String(settings.Devices[0].ShockDuration);
-  else if(var == "Device0.ShockInterval")
-  return String(settings.Devices[0].ShockInterval);
-  else if(var == "Device0.VibrateIntensity")
-    return String(settings.Devices[0].VibrateIntensity);
-  else if(var == "Device0.VibrateDuration")
-    return String(settings.Devices[0].VibrateDuration);
-  
-  //Device 1
-  else if(var == "Device1.DeviceType")
-    return String(static_cast<uint8_t>(settings.Devices[1].Type));
-  else if(var == "Device1.DeviceId")
-    return String(settings.Devices[1].DeviceId);
-  else if(var == "Device1.BeepEnabled")
-    return settings.Devices[1].FeatureEnabled(CommandFlag::Beep) ? "checked" : "";
-  else if(var == "Device1.VibrateEnabled")
-    return settings.Devices[1].FeatureEnabled(CommandFlag::Vibrate) ? "checked" : "";
-  else if(var == "Device1.ShockEnabled")
-    return settings.Devices[1].FeatureEnabled(CommandFlag::Shock) ? "checked" : "";
-  else if(var == "Device1.ShockIntensity")
-    return String(settings.Devices[1].ShockIntensity);
-  else if(var == "Device1.ShockDuration")
-    return String(settings.Devices[1].ShockDuration);
-  else if(var == "Device1.ShockInterval")
-  return String(settings.Devices[1].ShockInterval);
-  else if(var == "Device1.VibrateIntensity")
-    return String(settings.Devices[1].VibrateIntensity);
-  else if(var == "Device1.VibrateDuration")
-    return String(settings.Devices[1].VibrateDuration);
-
-  //Device 2
-  else if(var == "Device2.DeviceType")
-    return String(static_cast<uint8_t>(settings.Devices[2].Type));
-  else if(var == "Device2.DeviceId")
-    return String(settings.Devices[2].DeviceId);
-  else if(var == "Device2.BeepEnabled")
-    return settings.Devices[2].FeatureEnabled(CommandFlag::Beep) ? "checked" : "";
-  else if(var == "Device2.VibrateEnabled")
-    return settings.Devices[2].FeatureEnabled(CommandFlag::Vibrate) ? "checked" : "";
-  else if(var == "Device2.ShockEnabled")
-    return settings.Devices[2].FeatureEnabled(CommandFlag::Shock) ? "checked" : "";
-  else if(var == "Device2.ShockIntensity")
-    return String(settings.Devices[2].ShockIntensity);
-  else if(var == "Device2.ShockDuration")
-    return String(settings.Devices[2].ShockDuration);
-  else if(var == "Device2.ShockInterval")
-  return String(settings.Devices[2].ShockInterval);
-  else if(var == "Device2.VibrateIntensity")
-    return String(settings.Devices[2].VibrateIntensity);
-  else if(var == "Device2.VibrateDuration")
-    return String(settings.Devices[2].VibrateDuration);
+  if (var.startsWith("Device"))
+  {
+    int splitIndex = var.indexOf('.');
+    int deviceIndex = var.substring(6, splitIndex).toInt();
+    String deviceVar = var.substring(splitIndex + 1);
+    if (deviceVar == "DeviceType")
+      return String(static_cast<uint8_t>(EEPROMData.Devices[deviceIndex].Type));
+    else if (deviceVar == "DeviceId")
+      return String(EEPROMData.Devices[deviceIndex].DeviceId);
+    else if (deviceVar == "LightEnabled")
+      return EEPROMData.Devices[deviceIndex].FeatureEnabled(Command::Light) ? "checked" : "";
+    else if (deviceVar == "BeepEnabled")
+      return EEPROMData.Devices[deviceIndex].FeatureEnabled(Command::Beep) ? "checked" : "";
+    else if (deviceVar == "VibrateEnabled")
+      return EEPROMData.Devices[deviceIndex].FeatureEnabled(Command::Vibrate) ? "checked" : "";
+    else if (deviceVar == "ShockEnabled")
+      return EEPROMData.Devices[deviceIndex].FeatureEnabled(Command::Shock) ? "checked" : "";
+    else if (deviceVar == "ShockIntensity")
+      return String(EEPROMData.Devices[deviceIndex].ShockIntensity);
+    else if (deviceVar == "ShockDuration")
+      return String(EEPROMData.Devices[deviceIndex].ShockDuration);
+    else if (deviceVar == "ShockInterval")
+      return String(EEPROMData.Devices[deviceIndex].ShockInterval);
+    else if (deviceVar == "VibrateIntensity")
+      return String(EEPROMData.Devices[deviceIndex].VibrateIntensity);
+    else if (deviceVar == "VibrateDuration")
+      return String(EEPROMData.Devices[deviceIndex].VibrateDuration);
+    else
+      return String();
+  }
   else
-  return String();
+    return String();
 }
 
 void HTTP_GET_Index(AsyncWebServerRequest *request)
 {
   // If Wi-Fi is connected to an AP, send the default configuration page
-  if(WiFi.status() == WL_CONNECTED)
+  if (WiFi.status() == WL_CONNECTED)
   {
-    request->send(SPIFFS, "/index.html", String(),false, templateProcessor);
+    request->send(SPIFFS, "/index.html", String(), false, templateProcessor);
   }
-  //Otherwise we're in SoftAP mode
+  // Otherwise we're in SoftAP mode
   else
   {
-    if(request->host() == "shockies.local" || request->host() == String(WiFi.softAPIP()))
+    if (request->host() == "shockies.local" || request->host() == String(WiFi.softAPIP()))
     {
       request->send(SPIFFS, "/setup.html", String(), false, templateProcessor);
     }
@@ -382,7 +244,7 @@ void HTTP_GET_Index(AsyncWebServerRequest *request)
 }
 void HTTP_GET_Update(AsyncWebServerRequest *request)
 {
-  if(!request->authenticate("admin", settings.WifiPassword))
+  if (!request->authenticate("admin", EEPROMData.WifiPassword))
   {
     return request->requestAuthentication();
   }
@@ -391,48 +253,51 @@ void HTTP_GET_Update(AsyncWebServerRequest *request)
 
 void HTTP_POST_Submit(AsyncWebServerRequest *request)
 {
-  if(request->hasParam("configure_features", true))
+  if (request->hasParam("configure_features", true))
   {
-    for(int devId = 0; devId < 2; devId++)
+    for (int devId = 0; devId < 2; devId++)
     {
-      settings.Devices[devId].Features = CommandFlag::None;
-      if(request->hasParam("feature_beep" + String(devId), true))
-        settings.Devices[devId].EnableFeature(CommandFlag::Beep);
-      if(request->hasParam("feature_vibrate" + String(devId), true))
-        settings.Devices[devId].EnableFeature(CommandFlag::Vibrate);
-      if(request->hasParam("feature_shock" + String(devId), true))
-        settings.Devices[devId].EnableFeature(CommandFlag::Shock);
-      if(request->hasParam("device_id" + String(devId), true))
-        settings.Devices[devId].DeviceId = request->getParam("device_id" + String(devId), true)->value().toInt();
-      if(request->hasParam("device_type" + String(devId), true))
-        settings.Devices[devId].Type = (DeviceType)request->getParam("device_type" + String(devId), true)->value().toInt();
-      if(request->hasParam("shock_max_intensity" + String(devId), true))
-        settings.Devices[devId].ShockIntensity = request->getParam("shock_max_intensity" + String(devId), true)->value().toInt();
-      if(request->hasParam("shock_max_duration" + String(devId), true))
-        settings.Devices[devId].ShockDuration = request->getParam("shock_max_duration" + String(devId), true)->value().toInt();
-      if(request->hasParam("shock_interval" + String(devId), true))
-        settings.Devices[devId].ShockInterval = request->getParam("shock_interval" + String(devId), true)->value().toInt();
-      if(request->hasParam("vibrate_max_intensity" + String(devId), true))
-        settings.Devices[devId].VibrateIntensity = request->getParam("vibrate_max_intensity" + String(devId), true)->value().toInt();
-      if(request->hasParam("vibrate_max_duration" + String(devId), true))
-        settings.Devices[devId].VibrateDuration = request->getParam("vibrate_max_duration" + String(devId), true)->value().toInt();
+      EEPROMData.Devices[devId].Features = Command::None;
+      if (request->hasParam("feature_light" + String(devId), true))
+        EEPROMData.Devices[devId].EnableFeature(Command::Light);
+      if (request->hasParam("feature_beep" + String(devId), true))
+        EEPROMData.Devices[devId].EnableFeature(Command::Beep);
+      if (request->hasParam("feature_vibrate" + String(devId), true))
+        EEPROMData.Devices[devId].EnableFeature(Command::Vibrate);
+      if (request->hasParam("feature_shock" + String(devId), true))
+        EEPROMData.Devices[devId].EnableFeature(Command::Shock);
+      if (request->hasParam("device_id" + String(devId), true))
+        EEPROMData.Devices[devId].DeviceId = request->getParam("device_id" + String(devId), true)->value().toInt();
+      if (request->hasParam("device_type" + String(devId), true))
+        EEPROMData.Devices[devId].Type = (Model)request->getParam("device_type" + String(devId), true)->value().toInt();
+      if (request->hasParam("shock_max_intensity" + String(devId), true))
+        EEPROMData.Devices[devId].ShockIntensity = request->getParam("shock_max_intensity" + String(devId), true)->value().toInt();
+      if (request->hasParam("shock_max_duration" + String(devId), true))
+        EEPROMData.Devices[devId].ShockDuration = request->getParam("shock_max_duration" + String(devId), true)->value().toInt();
+      if (request->hasParam("shock_interval" + String(devId), true))
+        EEPROMData.Devices[devId].ShockInterval = request->getParam("shock_interval" + String(devId), true)->value().toInt();
+      if (request->hasParam("vibrate_max_intensity" + String(devId), true))
+        EEPROMData.Devices[devId].VibrateIntensity = request->getParam("vibrate_max_intensity" + String(devId), true)->value().toInt();
+      if (request->hasParam("vibrate_max_duration" + String(devId), true))
+        EEPROMData.Devices[devId].VibrateDuration = request->getParam("vibrate_max_duration" + String(devId), true)->value().toInt();
     }
-    settings.RequireDeviceId = request->hasParam("require_device_id", true);
-    webSocket->enable(!settings.RequireDeviceId);
-    if(settings.RequireDeviceId)
-      webSocket->closeAll();    
-    settings.AllowRemoteAccess = request->hasParam("allow_remote_access", true);
-    EEPROM.put(0, settings);
+    EEPROMData.RequireDeviceId = request->hasParam("require_device_id", true);
+    webSocket->enable(!EEPROMData.RequireDeviceId);
+    if (EEPROMData.RequireDeviceId)
+      webSocket->closeAll();
+    EEPROMData.AllowRemoteAccess = request->hasParam("allow_remote_access", true);
+    EEPROM.put(0, EEPROMData);
     EEPROM.commit();
+    UpdateDevices();
     WS_SendConfig();
   }
-  else if(request->hasParam("configure_wifi", true))
+  else if (request->hasParam("configure_wifi", true))
   {
-    if(request->hasParam("wifi_ssid", true))
-      request->getParam("wifi_ssid", true)->value().toCharArray(settings.WifiName, 33);
-    if(request->hasParam("wifi_password", true))
-      request->getParam("wifi_password", true)->value().toCharArray(settings.WifiPassword, 65);
-    EEPROM.put(0, settings);
+    if (request->hasParam("wifi_ssid", true))
+      request->getParam("wifi_ssid", true)->value().toCharArray(EEPROMData.WifiName, 33);
+    if (request->hasParam("wifi_password", true))
+      request->getParam("wifi_password", true)->value().toCharArray(EEPROMData.WifiPassword, 65);
+    EEPROM.put(0, EEPROMData);
     EEPROM.commit();
     Serial.println("Wi-Fi configuration changed, rebooting...");
     rebootDevice = true;
@@ -442,7 +307,7 @@ void HTTP_POST_Submit(AsyncWebServerRequest *request)
 
 void HTTP_POST_Update(AsyncWebServerRequest *request)
 {
-  if(!request->authenticate("admin", settings.WifiPassword))
+  if (!request->authenticate("admin", EEPROMData.WifiPassword))
   {
     return request->requestAuthentication();
   }
@@ -454,177 +319,165 @@ void HTTP_POST_Update(AsyncWebServerRequest *request)
 
 void HTTP_FILE_Update(AsyncWebServerRequest *request, String fileName, size_t index, uint8_t *data, size_t len, bool final)
 {
-  if(!request->authenticate("admin", settings.WifiPassword))
+  if (!request->authenticate("admin", EEPROMData.WifiPassword))
   {
     return request->requestAuthentication();
   }
 
-  if(index == 0)
+  if (index == 0)
   {
     Serial.println(fileName);
-    if(fileName == "Shockies.ino.bin")
+    if (fileName == "Shockies.ino.bin")
     {
-      if(!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH))
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH))
       {
         return request->send(400, "text/plain", "Update Unable to start");
       }
     }
-    else if(fileName == "Shockies.spiffs.bin")
+    else if (fileName == "Shockies.spiffs.bin")
     {
-      if(!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS))
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS))
       {
         return request->send(400, "text/plain", "Update Unable to start");
       }
     }
   }
 
-  if(len > 0)
+  if (len > 0)
   {
-      if(!Update.write(data, len))
-      {
-        return request->send(400, "text/plain", "Update Unable to write");
-      }    
+    if (!Update.write(data, len))
+    {
+      return request->send(400, "text/plain", "Update Unable to write");
+    }
   }
 
-  if(final)
+  if (final)
   {
-    if(!Update.end(true))
+    if (!Update.end(true))
     {
       return request->send(400, "text/plain", "Update Unable to finish update");
-    }       
+    }
   }
 }
 
-void WS_HandleEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
+void WS_HandleEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
 {
-  switch(type) {
-      case WS_EVT_DISCONNECT:
-          Serial.printf("[%u] Disconnected from %s!\n", client->id(), server->url());
-          break;
-      case WS_EVT_CONNECT:
-          {
-            IPAddress ip = client->remoteIP();
-            Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", client->id(), ip[0], ip[1], ip[2], ip[3], server->url());
-            client->text("OK: CONNECTED");
-            WS_SendConfig();
-          }
-          break;
-      case WS_EVT_DATA:
-          {   
-            AwsFrameInfo * info = (AwsFrameInfo*)arg;
-            if(info->final && info->opcode == WS_TEXT)
-            {
-              data[len] = '\0';
-              Serial.printf("[%u] Message: %s\r\n", client->id(), data);
-              if(emergencyStop)
-              {
-                Serial.printf("[%u] EMERGENCY STOP\nDevice will not accept commands until rebooted.\n", client->id());
-                server->textAll("ERROR: EMERGENCY STOP");
-                return;        
-              }
+  switch (type)
+  {
+  case WS_EVT_DISCONNECT:
+    Serial.printf("[%u] Disconnected from %s!\n", client->id(), server->url());
+    break;
+  case WS_EVT_CONNECT:
+  {
+    IPAddress ip = client->remoteIP();
+    Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", client->id(), ip[0], ip[1], ip[2], ip[3], server->url());
+    client->text("OK: CONNECTED");
+    WS_SendConfig();
+  }
+  break;
+  case WS_EVT_DATA:
+  {
+    std::lock_guard<std::mutex> guard(DevicesMutex);
+    AwsFrameInfo *info = (AwsFrameInfo *)arg;
+    if (info->final && info->opcode == WS_TEXT)
+    {
+      data[len] = '\0';
+      Serial.printf("[%u] Message: %s\r\n", client->id(), data);
+      if (emergencyStop)
+      {
+        Serial.printf("[%u] EMERGENCY STOP\nDevice will not accept commands until rebooted.\n", client->id());
+        server->textAll("ERROR: EMERGENCY STOP");
+        return;
+      }
 
-              char* command = strtok((char*)data, " ");
-              char* id_str = strtok(0, " ");
-              char* intensity_str = strtok(0, " ");
+      char *command = strtok((char *)data, " ");
+      char *id_str = strtok(0, " ");
+      char *intensity_str = strtok(0, " ");
 
-              if(command == 0)
-              {
-                Serial.printf("[%u] Text Error: Invalid Message\r\n", client->id());
-                client->text("ERROR: INVALID FORMAT");
-                break;
-              }
+      if (command == 0)
+      {
+        Serial.printf("[%u] Text Error: Invalid Message\r\n", client->id());
+        client->text("ERROR: INVALID FORMAT");
+        break;
+      }
 
-              //Reset the current command status, and stop sending the command.
-              if(*command == 'R')
-              {
-                uint32_t commandTimeout = ((currentCommand.Command == CommandFlag::Shock) ? settings.Devices[currentCommand.DeviceIndex].ShockDuration : settings.Devices[currentCommand.DeviceIndex].VibrateDuration) * 1000;
-                lastCommand = currentCommand;
-                lastCommand.EndTime = min((uint32_t)millis(), lastCommand.StartTime + commandTimeout);
-                currentCommand.Reset();
-                client->text("OK: R");
-                break;
-              }
-              //Triggers an emergency stop. This will require the ESP-32 to be rebooted.
-              else if(*command == 'X')
-              {
-                emergencyStop = true;
-                currentCommand.Reset();
-                client->text("OK: EMERGENCY STOP");
-                break;
-              }
-              //Ping to reset the lost connection timeout.
-              else if(*command == 'P')
-              {
-                lastWatchdogTime = millis();
-                break;
-              }
+      // Reset the current command status, and stop sending the command.
+      if (*command == 'R')
+      {
+        for (auto &device : Devices)
+        {
+          device->SetCommand(Command::None);
+        }
+        client->text("OK: R");
+        break;
+      }
+      // Triggers an emergency stop. This will require the ESP-32 to be rebooted.
+      else if (*command == 'X')
+      {
+        emergencyStop = true;
+        for (auto &device : Devices)
+        {
+          device->SetCommand(Command::None);
+        }
+        client->text("OK: EMERGENCY STOP");
+        break;
+      }
+      // Ping to reset the lost connection timeout.
+      else if (*command == 'P')
+      {
+        lastWatchdogTime = millis();
+        break;
+      }
 
-              if(id_str == 0 || intensity_str == 0)
-              {
-                Serial.printf("[%u] Text Error: Invalid Message\n", client->id());
-                client->text("ERROR: INVALID FORMAT");
-                break;
-              }
+      if (id_str == 0 || intensity_str == 0)
+      {
+        Serial.printf("[%u] Text Error: Invalid Message\n", client->id());
+        client->text("ERROR: INVALID FORMAT");
+        break;
+      }
 
-              uint16_t id = atoi(id_str);
-              uint8_t intensity = atoi(intensity_str);
+      uint16_t id = atoi(id_str);
+      uint8_t intensity = atoi(intensity_str);
 
-              if(id > 3)
-                return;
+      if (id > 3)
+        return;
 
-              //Light
-              if(*command == 'L' && settings.Devices[id].FeatureEnabled(CommandFlag::Light))
-              {
-                currentCommand.Set(id, CommandFlag::Light, intensity);
-                client->text("OK: L");
-                break;
-              }
-              //Beep
-              else if(*command == 'B' && settings.Devices[id].FeatureEnabled(CommandFlag::Beep))
-              {
-                currentCommand.Set(id, CommandFlag::Beep, intensity);
-                client->text("OK: B");
-                break;
-              }
-              //Vibrate
-              else if(*command == 'V' && settings.Devices[id].FeatureEnabled(CommandFlag::Vibrate))
-              {
-                currentCommand.Set(id, CommandFlag::Vibrate, intensity);
-                client->text("OK: V");
-                break;
-              }
-              //Shock
-              else if(*command == 'S' && settings.Devices[id].FeatureEnabled(CommandFlag::Shock))
-              {
-                if(millis() - lastCommand.EndTime < max(1, (int)settings.Devices[id].ShockInterval) * 1000)
-                {
-                  if((lastCommand.EndTime - lastCommand.StartTime) < settings.Devices[id].ShockDuration * 1000)
-                  {
-                    currentCommand.StartTime = millis() - (lastCommand.EndTime - lastCommand.StartTime);
-                  }
-                  else
-                  {
-                    currentCommand.StartTime = lastCommand.StartTime;
-                  }
-                  currentCommand.DeviceIndex = id;
-                  currentCommand.Intensity = intensity;
-                  currentCommand.Command = CommandFlag::Shock;
-                }
-                else
-                {
-                  currentCommand.Set(id, CommandFlag::Shock, intensity);
-                }
-                client->text("OK: S");
-                break;
-              }
-              else
-              {
-                Serial.printf("[%u] Ignored Command %c\n", client->id(), *command);
-                break;
-              }
-            }
-          }
-          break;
+      // Light
+      if (*command == 'L' && EEPROMData.Devices[id].FeatureEnabled(Command::Light))
+      {
+        Devices[id]->SetCommand(Command::Light, intensity);
+        client->text("OK: L");
+        break;
+      }
+      // Beep
+      else if (*command == 'B' && EEPROMData.Devices[id].FeatureEnabled(Command::Beep))
+      {
+        Devices[id]->SetCommand(Command::Beep, intensity);
+        client->text("OK: B");
+        break;
+      }
+      // Vibrate
+      else if (*command == 'V' && EEPROMData.Devices[id].FeatureEnabled(Command::Vibrate))
+      {
+        Devices[id]->SetCommand(Command::Vibrate, intensity);
+        client->text("OK: V");
+        break;
+      }
+      // Shock
+      else if (*command == 'S' && EEPROMData.Devices[id].FeatureEnabled(Command::Shock))
+      {
+        Devices[id]->SetCommand(Command::Shock, intensity);
+        client->text("OK: S");
+        break;
+      }
+      else
+      {
+        Serial.printf("[%u] Ignored Command %c\n", client->id(), *command);
+        break;
+      }
+    }
+  }
+  break;
   }
 }
 
@@ -632,12 +485,30 @@ void WS_SendConfig()
 {
   char configBuffer[256];
   sprintf(configBuffer, "CONFIG:%04X%02X%02X%02X%02X%02X",
-  0,
-  settings.Devices[0].Features,
-  settings.Devices[0].ShockIntensity,
-  settings.Devices[0].ShockDuration,
-  settings.Devices[0].VibrateIntensity,
-  settings.Devices[0].VibrateDuration);
+          0,
+          EEPROMData.Devices[0].Features,
+          EEPROMData.Devices[0].ShockIntensity,
+          EEPROMData.Devices[0].ShockDuration,
+          EEPROMData.Devices[0].VibrateIntensity,
+          EEPROMData.Devices[0].VibrateDuration);
   webSocket->textAll(configBuffer);
   webSocketId->textAll(configBuffer);
+}
+
+void UpdateDevices()
+{
+  std::lock_guard<std::mutex> guard(DevicesMutex);
+  Devices.clear();
+  for (int i = 0; i < 3; i++)
+  {
+    switch (EEPROMData.Devices[i].Type)
+    {
+    case Model::Petrainer:
+      Devices.push_back(std::unique_ptr<Petrainer>(new Petrainer(DeviceTransmitter, EEPROMData.Devices[i])));
+      break;
+    case Model::Funtrainer:
+      Devices.push_back(std::unique_ptr<Funnipet>(new Funnipet(DeviceTransmitter, EEPROMData.Devices[i])));
+      break;
+    }
+  }
 }
