@@ -9,7 +9,7 @@ Device::Device(shared_ptr<Transmitter> transmitter, const Model deviceModel, con
 
 void Device::SetCommand(Command targetCommand, unsigned char value)
 {
-    Serial.printf("SetCommand: %i\n", targetCommand);
+    unsigned int currentTime = millis();
     int commandMaxInterval = static_cast<int>(DeviceSettings.ShockInterval);
     int commandMaxDuration = static_cast<int>(DeviceCommand == Command::Shock ? DeviceSettings.ShockDuration : DeviceSettings.VibrateDuration);
     int commandMaxValue = static_cast<int>(DeviceCommand == Command::Shock ? DeviceSettings.ShockIntensity : DeviceSettings.VibrateIntensity);
@@ -17,52 +17,48 @@ void Device::SetCommand(Command targetCommand, unsigned char value)
     if (targetCommand == Command::None)
     {
         DeviceHasCommand = false;
-        DeviceCommandEnd = min((unsigned int)millis(), DeviceCommandStart + commandMaxDuration);
+        DeviceCommandEnd = min(currentTime, DeviceCommandStart + commandMaxDuration);
     }
     else
     {
         DeviceHasCommand = true;
         DeviceCommand = targetCommand;
         DeviceCommandValue = min(static_cast<int>(value), commandMaxValue);
-        Serial.println("HasCommand: True");
 
         // Check if we're trying to start a new command before the previous interval has expired
-        if (millis() - DeviceCommandEnd < max(1, commandMaxInterval) * 1000)
+        if (currentTime - DeviceCommandEnd < max(1, commandMaxInterval) * 1000)
         {
-            Serial.println("NonExpired");
             // If so, check if we have any duration leftover from the previous command.
             if ((DeviceCommandEnd - DeviceCommandStart) < commandMaxDuration * 1000)
             {
-                Serial.println("Reuse");
                 // If there is time left, offset the start time by the amount of time used
                 // so that we can use the remaining time (for quick bursts, for example)
-                DeviceCommandStart = millis() - (DeviceCommandEnd - DeviceCommandStart);
+                DeviceCommandStart = currentTime - (DeviceCommandEnd - DeviceCommandStart);
             }
             // If not, leave the start time where it was.
         }
         else
         {
             Serial.println("NewStart");
-            DeviceCommandStart = millis();
+            DeviceCommandStart = currentTime;
         }
     }
 }
 
-void Device::ResetWatchdog()
+void Device::ResetWatchdog(unsigned int currentTime)
 {
     WatchdogTime = millis();
 }
 
-bool Device::CheckWatchdog()
+bool Device::CheckWatchdog(unsigned int currentTime)
 {
-    return millis() - WatchdogTime < WatchdogTimeout;
+    return currentTime - WatchdogTime < WatchdogTimeout;
 }
 
-bool Device::ShouldTransmit()
+bool Device::ShouldTransmit(unsigned int currentTime)
 {
     if (DeviceCommand == Command::None || !DeviceHasCommand)
         return false;
-    uint32_t currentTime = millis();
     if (DeviceCommand == Command::Shock && (currentTime - DeviceCommandStart) > (DeviceSettings.ShockDuration * 1000))
         return false;
     if (DeviceCommand == Command::Vibrate && (currentTime - DeviceCommandStart) > (DeviceSettings.VibrateDuration * 1000))
@@ -75,7 +71,7 @@ Petrainer::Petrainer(shared_ptr<Transmitter> transmitter, Settings deviceSetting
 {
 }
 
-void Petrainer::TransmitCommand()
+void Petrainer::TransmitCommand(unsigned int currentTime)
 {
     // N = Channel ID (1 or 2)
     // C = Command
@@ -102,7 +98,7 @@ void Petrainer::TransmitCommand()
      * until it beeps, and then send a command with the
      * desired Channel ID and Collar ID
      */
-    if (!ShouldTransmit())
+    if (!ShouldTransmit(currentTime))
         return;
 
     unsigned long long data = 0LL;
@@ -135,10 +131,11 @@ Funnipet::Funnipet(shared_ptr<Transmitter> transmitter, Settings deviceSettings)
 {
 }
 
-void Funnipet::TransmitCommand()
+void Funnipet::TransmitCommand(unsigned int currentTime)
 {
-    if (!ShouldTransmit())
+    if (!ShouldTransmit(currentTime))
         return;
+
     unsigned long long data = 0LL;
     data |= (((unsigned long long)DeviceSettings.DeviceId) << 24);
     data |= (((unsigned long long)MapCommand(DeviceCommand)) << 16);

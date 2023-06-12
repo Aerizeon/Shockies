@@ -74,10 +74,10 @@ public:
 
     Device(shared_ptr<Transmitter> transmitter, const Model deviceModel, const Settings deviceSettings, const Protocol deviceProtocol);
     void SetCommand(Command targetCommand = Command::None, unsigned char value = 0);
-    void ResetWatchdog();
-    bool CheckWatchdog();
-    bool ShouldTransmit();
-    virtual void TransmitCommand() = 0;
+    void ResetWatchdog(unsigned int currentTime);
+    bool CheckWatchdog(unsigned int currentTime);
+    bool ShouldTransmit(unsigned int currentTime);
+    virtual void TransmitCommand(unsigned int currentTime) = 0;
     virtual unsigned char MapCommand(Command targetCommand) = 0;
     ~Device()
     {
@@ -98,7 +98,7 @@ class Petrainer : public Device
 {
 public:
     Petrainer(shared_ptr<Transmitter> transmitter, Settings deviceSettings);
-    void TransmitCommand() override;
+    void TransmitCommand(unsigned int currentTime) override;
     unsigned char MapCommand(Command targetCommand) override;
     ~Petrainer()
     {
@@ -110,7 +110,7 @@ class Funnipet : public Device
 {
 public:
     Funnipet(shared_ptr<Transmitter> transmitter, Settings deviceSettings);
-    void TransmitCommand() override;
+    void TransmitCommand(unsigned int currentTime) override;
     unsigned char MapCommand(Command targetCommand) override;
     ~Funnipet()
     {

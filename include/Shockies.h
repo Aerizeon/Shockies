@@ -4,15 +4,17 @@
 #include <Devices.h>
 #include <Transmit.h>
 #include <mutex>
+#include <DNSServer.h>
 
 using std::vector;
 using std::shared_ptr;
 using std::unique_ptr;
 using std::mutex;
+using std::lock_guard;
 
 #define UUID_STR_LEN 37
 #define SHOCKIES_SETTINGS_VERSION 8
-#define SHOCKIES_VERSION "1.3.0"
+#define SHOCKIES_VERSION "1.4.0"
 
 typedef uint8_t uuid_t[16];
 
@@ -34,6 +36,10 @@ uint32_t lastUpdateCheck = 0;
 mutex DevicesMutex;
 vector<unique_ptr<Device>> Devices;
 shared_ptr<Transmitter> DeviceTransmitter;
+AsyncWebServer webServer(80);
+AsyncWebSocket *webSocket;
+AsyncWebSocket *webSocketId;
+DNSServer dnsServer;
 
 /**
  * Stored EEPROM Settings

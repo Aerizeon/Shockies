@@ -3,17 +3,15 @@
 #include <WiFiClientSecure.h>
 #include <AsyncTCP.h>
 #include <ESPmDNS.h>
-#include <DNSServer.h>
+
 #include <EEPROM.h>
 #include <SPIFFS.h>
 #include <Update.h>
 #include <esp32-hal.h>
 #include <memory>
+#include <WebSocketClient.h>
 
-AsyncWebServer webServer(80);
-AsyncWebSocket *webSocket;
-AsyncWebSocket *webSocketId;
-DNSServer dnsServer;
+WebSocketClient *c;
 
 void setup()
 {
@@ -22,7 +20,7 @@ void setup()
   Serial.setDebugOutput(true);
   Serial.println();
   Serial.println("Device is booting...");
-
+  
   if (!SPIFFS.begin(true))
   {
     Serial.println("An Error has occurred while mounting SPIFFS");
@@ -104,7 +102,7 @@ void setup()
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(53, "*", WiFi.softAPIP());
   }
-
+  c = new WebSocketClient("192.168.1.151", 5106, "/api/controllerinterface");
   webSocket = new AsyncWebSocket("/websocket/");
   webSocketId = new AsyncWebSocket("/websocket/" + String(EEPROMData.DeviceId));
   webSocket->onEvent(WS_HandleEvent);
@@ -127,7 +125,7 @@ void setup()
 
   webServer.begin();
   webServer.addHandler(webSocket);
-  // webServer.addHandler(webSocketId);
+  webServer.addHandler(webSocketId);
 
   Serial.println("Starting mDNS...");
 
@@ -151,6 +149,7 @@ void setup()
 
 void loop()
 {
+  unsigned int currentTime = millis();
   webSocket->cleanupClients();
   webSocketId->cleanupClients();
   dnsServer.processNextRequest();
@@ -165,10 +164,10 @@ void loop()
   if (emergencyStop)
     return;
 
-  std::lock_guard<std::mutex> guard(DevicesMutex);
+  lock_guard<mutex> guard(DevicesMutex);
   for (auto &device : Devices)
   {
-    device->TransmitCommand();
+    device->TransmitCommand(currentTime);
   }
 }
 
