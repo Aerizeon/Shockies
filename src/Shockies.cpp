@@ -9,9 +9,9 @@
 #include <Update.h>
 #include <esp32-hal.h>
 #include <memory>
-#include <WebSocketClient.h>
+#include <ShockiesRemote.h>
 
-WebSocketClient *c;
+ShockiesRemote *c;
 
 void setup()
 {
@@ -20,7 +20,7 @@ void setup()
   Serial.setDebugOutput(true);
   Serial.println();
   Serial.println("Device is booting...");
-  
+
   if (!SPIFFS.begin(true))
   {
     Serial.println("An Error has occurred while mounting SPIFFS");
@@ -102,7 +102,10 @@ void setup()
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(53, "*", WiFi.softAPIP());
   }
-  c = new WebSocketClient("192.168.1.151", 5106, "/api/controllerinterface");
+  c = new ShockiesRemote(EEPROMData.DeviceId);
+  c->onCommand(HandleCommand);
+  c->connect("192.168.2.4", 5071);
+
   webSocket = new AsyncWebSocket("/websocket/");
   webSocketId = new AsyncWebSocket("/websocket/" + String(EEPROMData.DeviceId));
   webSocket->onEvent(WS_HandleEvent);
@@ -492,6 +495,104 @@ void WS_SendConfig()
           EEPROMData.Devices[0].VibrateDuration);
   webSocket->textAll(configBuffer);
   webSocketId->textAll(configBuffer);
+}
+
+void HandleCommand(char *data, size_t len)
+{
+  data[len] = '\0';
+  Serial.printf("[-1] Message: %s\r\n", data);
+  if (emergencyStop)
+  {
+    Serial.printf("[-1] EMERGENCY STOP\nDevice will not accept commands until rebooted.\n");
+    //server->textAll("ERROR: EMERGENCY STOP");
+    return;
+  }
+
+  char *command = strtok((char *)data, " ");
+  char *id_str = strtok(0, " ");
+  char *intensity_str = strtok(0, " ");
+
+  if (command == 0)
+  {
+    Serial.printf("[-1] Text Error: Invalid Message\r\n");
+    //client->text("ERROR: INVALID FORMAT");
+    return;
+  }
+
+  // Reset the current command status, and stop sending the command.
+  if (*command == 'R')
+  {
+    for (auto &device : Devices)
+    {
+      device->SetCommand(Command::None);
+    }
+    //client->text("OK: R");
+    return;
+  }
+  // Triggers an emergency stop. This will require the ESP-32 to be rebooted.
+  else if (*command == 'X')
+  {
+    emergencyStop = true;
+    for (auto &device : Devices)
+    {
+      device->SetCommand(Command::None);
+    }
+    //client->text("OK: EMERGENCY STOP");
+    return;
+  }
+  // Ping to reset the lost connection timeout.
+  else if (*command == 'P')
+  {
+    lastWatchdogTime = millis();
+    return;
+  }
+
+  if (id_str == 0 || intensity_str == 0)
+  {
+    Serial.printf("[-1] Text Error: Invalid Message\n");
+    //client->text("ERROR: INVALID FORMAT");
+    return;
+  }
+
+  uint16_t id = atoi(id_str);
+  uint8_t intensity = atoi(intensity_str);
+
+  if (id > 3)
+    return;
+
+  // Light
+  if (*command == 'L' && EEPROMData.Devices[id].FeatureEnabled(Command::Light))
+  {
+    Devices[id]->SetCommand(Command::Light, intensity);
+    //client->text("OK: L");
+    return;
+  }
+  // Beep
+  else if (*command == 'B' && EEPROMData.Devices[id].FeatureEnabled(Command::Beep))
+  {
+    Devices[id]->SetCommand(Command::Beep, intensity);
+    //client->text("OK: B");
+    return;
+  }
+  // Vibrate
+  else if (*command == 'V' && EEPROMData.Devices[id].FeatureEnabled(Command::Vibrate))
+  {
+    Devices[id]->SetCommand(Command::Vibrate, intensity);
+    //client->text("OK: V");
+    return;
+  }
+  // Shock
+  else if (*command == 'S' && EEPROMData.Devices[id].FeatureEnabled(Command::Shock))
+  {
+    Devices[id]->SetCommand(Command::Shock, intensity);
+    //client->text("OK: S");
+    return;
+  }
+  else
+  {
+    Serial.printf("[-1] Ignored Command %c\n", *command);
+    return;
+  }
 }
 
 void UpdateDevices()
