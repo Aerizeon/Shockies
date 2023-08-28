@@ -4,20 +4,35 @@
 
 class AsyncSSLClient;
 
-typedef std::function<void(char*, size_t)> CommandHandler;
+typedef std::function<void(char *, size_t)> CommandHandler;
+typedef std::function<void(void)> ConnectionHandler;
+
 #define UUID_STR_LEN 37
 
-class ShockiesRemote {
+class ShockiesRemote
+{
 public:
- ShockiesRemote(char* uuid);
- void connect(const char* addr, unsigned int port);
- void onCommand(CommandHandler handler);
+    ShockiesRemote(const char *uuid);
+    void connect(const char *addr, unsigned int port);
+    void sendCommand(const char *command);
+    void onCommand(CommandHandler handler);
+    void onConnected(ConnectionHandler handler);
+    void onDisconnected(ConnectionHandler handler);
 
- private:
- char*  deviceUuid = nullptr;
- CommandHandler _commandHandler = nullptr;
- void onConnect(AsyncSSLClient *client);
- void onData(AsyncSSLClient *client, void *data, int len);
+private:
+    char dataBuf[256];
+    const char* deviceUuid = nullptr;
+    const char* addr = nullptr;
+    unsigned int port = 0;
+
+
+    CommandHandler _commandHandler = nullptr;
+    ConnectionHandler _connectedHandler = nullptr;
+    ConnectionHandler _disconnectedHandler = nullptr;
+
+    void connected(AsyncSSLClient *client);
+    void disconnected(AsyncSSLClient *client);
+    void data(AsyncSSLClient *client, void *data, int len);
 };
 
 #endif

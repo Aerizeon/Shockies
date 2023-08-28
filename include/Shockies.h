@@ -84,7 +84,9 @@ void WS_HandleEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEve
 
 void WS_SendConfig();
 
-void HandleCommand(char* data, size_t len);
+void SR_HandleConnected();
+
+void SR_HandleCommand(char* data, size_t len);
 
 void UpdateDevices();
 

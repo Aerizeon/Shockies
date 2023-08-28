@@ -103,7 +103,8 @@ void setup()
     dnsServer.start(53, "*", WiFi.softAPIP());
   }
   c = new ShockiesRemote(EEPROMData.DeviceId);
-  c->onCommand(HandleCommand);
+  c->onCommand(SR_HandleCommand);
+  c->onConnected(SR_HandleConnected);
   c->connect("192.168.2.4", 5071);
 
   webSocket = new AsyncWebSocket("/websocket/");
@@ -292,6 +293,7 @@ void HTTP_POST_Submit(AsyncWebServerRequest *request)
     EEPROM.commit();
     UpdateDevices();
     WS_SendConfig();
+    SR_HandleConnected();
   }
   else if (request->hasParam("configure_wifi", true))
   {
@@ -496,8 +498,20 @@ void WS_SendConfig()
   webSocket->textAll(configBuffer);
   webSocketId->textAll(configBuffer);
 }
+void SR_HandleConnected()
+{
+  char configBuffer[256];
+  sprintf(configBuffer, "CONFIG:%04X%02X%02X%02X%02X%02X",
+          0,
+          EEPROMData.Devices[0].Features,
+          EEPROMData.Devices[0].ShockIntensity,
+          EEPROMData.Devices[0].ShockDuration,
+          EEPROMData.Devices[0].VibrateIntensity,
+          EEPROMData.Devices[0].VibrateDuration);
+  c->sendCommand(configBuffer);
+}
 
-void HandleCommand(char *data, size_t len)
+void SR_HandleCommand(char *data, size_t len)
 {
   data[len] = '\0';
   Serial.printf("[-1] Message: %s\r\n", data);
