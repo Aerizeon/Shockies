@@ -26,6 +26,12 @@ void ShockiesRemote::connect(const char *addr, unsigned int port)
                    this);
 }
 
+void ShockiesRemote::disconnect()
+{
+    _disconnecting = true;
+    client->close();
+}
+
 void ShockiesRemote::sendCommand(const char *command)
 {
     int len = strlen(command);
@@ -35,6 +41,11 @@ void ShockiesRemote::sendCommand(const char *command)
         dataBuf[0] = len;
         client->write(dataBuf, len + 1);
     }
+}
+
+bool ShockiesRemote::isConnected()
+{
+    return _isConnected;
 }
 
 void ShockiesRemote::onCommand(CommandHandler handler)
@@ -56,6 +67,7 @@ void ShockiesRemote::connected(AsyncSSLClient *c)
 {
     c->setNoDelay(true);
     sendCommand(deviceUuid);
+    _isConnected = true;
 
     if (_connectedHandler != nullptr)
     {
@@ -65,14 +77,16 @@ void ShockiesRemote::connected(AsyncSSLClient *c)
 
 void ShockiesRemote::disconnected(AsyncSSLClient *client)
 {
+    _isConnected = false;
     if (_disconnectedHandler != nullptr)
     {
         _disconnectedHandler();
     }
     // This is probably a bad idea, but let's do it anyways
     // Try to reconnect if we disconnect, since this shouldn't normally happen.
-
-    client->connect(addr, port, true);
+    if(!_disconnecting)
+        client->connect(addr, port, true);
+    _disconnecting = false;
 }
 
 void ShockiesRemote::data(AsyncSSLClient *client, void *data, int len)

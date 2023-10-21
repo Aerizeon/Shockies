@@ -17,7 +17,7 @@ void Device::SetCommand(Command targetCommand, unsigned char value)
     if (targetCommand == Command::None)
     {
         DeviceHasCommand = false;
-        DeviceCommandEnd = min(currentTime, DeviceCommandStart + commandMaxDuration);
+        DeviceCommandEnd = max(currentTime, DeviceCommandStart + commandMaxDuration);
     }
     else
     {

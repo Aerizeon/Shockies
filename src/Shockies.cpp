@@ -11,7 +11,7 @@
 #include <memory>
 #include <ShockiesRemote.h>
 
-ShockiesRemote *c;
+ShockiesRemote *remoteControl;
 
 void setup()
 {
@@ -102,10 +102,11 @@ void setup()
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(53, "*", WiFi.softAPIP());
   }
-  c = new ShockiesRemote(EEPROMData.DeviceId);
-  c->onCommand(SR_HandleCommand);
-  c->onConnected(SR_HandleConnected);
-  c->connect("192.168.2.4", 5071);
+  remoteControl = new ShockiesRemote(EEPROMData.DeviceId);
+  remoteControl->onCommand(SR_HandleCommand);
+  remoteControl->onConnected(SR_HandleConnected);
+  //if(EEPROMData.AllowRemoteAccess)
+    //remoteControl->connect("192.168.2.4", 5071);
 
   webSocket = new AsyncWebSocket("/websocket/");
   webSocketId = new AsyncWebSocket("/websocket/" + String(EEPROMData.DeviceId));
@@ -291,9 +292,17 @@ void HTTP_POST_Submit(AsyncWebServerRequest *request)
     EEPROMData.AllowRemoteAccess = request->hasParam("allow_remote_access", true);
     EEPROM.put(0, EEPROMData);
     EEPROM.commit();
+
+    //if(EEPROMData.AllowRemoteAccess && !remoteControl->isConnected())
+      //remoteControl->connect("192.168.2.4", 5071);
+    //if(!EEPROMData.AllowRemoteAccess && remoteControl->isConnected())
+      //remoteControl->disconnect();
+    
     UpdateDevices();
     WS_SendConfig();
-    SR_HandleConnected();
+
+    if(EEPROMData.AllowRemoteAccess && remoteControl->isConnected())
+      SR_HandleConnected();
   }
   else if (request->hasParam("configure_wifi", true))
   {
@@ -381,103 +390,15 @@ void WS_HandleEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEve
   break;
   case WS_EVT_DATA:
   {
-    std::lock_guard<std::mutex> guard(DevicesMutex);
     AwsFrameInfo *info = (AwsFrameInfo *)arg;
     if (info->final && info->opcode == WS_TEXT)
     {
       data[len] = '\0';
       Serial.printf("[%u] Message: %s\r\n", client->id(), data);
-      if (emergencyStop)
+      const char* message = HandleCommand((char*)data);
+      if(message != nullptr)
       {
-        Serial.printf("[%u] EMERGENCY STOP\nDevice will not accept commands until rebooted.\n", client->id());
-        server->textAll("ERROR: EMERGENCY STOP");
-        return;
-      }
-
-      char *command = strtok((char *)data, " ");
-      char *id_str = strtok(0, " ");
-      char *intensity_str = strtok(0, " ");
-
-      if (command == 0)
-      {
-        Serial.printf("[%u] Text Error: Invalid Message\r\n", client->id());
-        client->text("ERROR: INVALID FORMAT");
-        break;
-      }
-
-      // Reset the current command status, and stop sending the command.
-      if (*command == 'R')
-      {
-        for (auto &device : Devices)
-        {
-          device->SetCommand(Command::None);
-        }
-        client->text("OK: R");
-        break;
-      }
-      // Triggers an emergency stop. This will require the ESP-32 to be rebooted.
-      else if (*command == 'X')
-      {
-        emergencyStop = true;
-        for (auto &device : Devices)
-        {
-          device->SetCommand(Command::None);
-        }
-        client->text("OK: EMERGENCY STOP");
-        break;
-      }
-      // Ping to reset the lost connection timeout.
-      else if (*command == 'P')
-      {
-        lastWatchdogTime = millis();
-        break;
-      }
-
-      if (id_str == 0 || intensity_str == 0)
-      {
-        Serial.printf("[%u] Text Error: Invalid Message\n", client->id());
-        client->text("ERROR: INVALID FORMAT");
-        break;
-      }
-
-      uint16_t id = atoi(id_str);
-      uint8_t intensity = atoi(intensity_str);
-
-      if (id > 3)
-        return;
-
-      // Light
-      if (*command == 'L' && EEPROMData.Devices[id].FeatureEnabled(Command::Light))
-      {
-        Devices[id]->SetCommand(Command::Light, intensity);
-        client->text("OK: L");
-        break;
-      }
-      // Beep
-      else if (*command == 'B' && EEPROMData.Devices[id].FeatureEnabled(Command::Beep))
-      {
-        Devices[id]->SetCommand(Command::Beep, intensity);
-        client->text("OK: B");
-        break;
-      }
-      // Vibrate
-      else if (*command == 'V' && EEPROMData.Devices[id].FeatureEnabled(Command::Vibrate))
-      {
-        Devices[id]->SetCommand(Command::Vibrate, intensity);
-        client->text("OK: V");
-        break;
-      }
-      // Shock
-      else if (*command == 'S' && EEPROMData.Devices[id].FeatureEnabled(Command::Shock))
-      {
-        Devices[id]->SetCommand(Command::Shock, intensity);
-        client->text("OK: S");
-        break;
-      }
-      else
-      {
-        Serial.printf("[%u] Ignored Command %c\n", client->id(), *command);
-        break;
+        client->text(message);
       }
     }
   }
@@ -508,30 +429,32 @@ void SR_HandleConnected()
           EEPROMData.Devices[0].ShockDuration,
           EEPROMData.Devices[0].VibrateIntensity,
           EEPROMData.Devices[0].VibrateDuration);
-  c->sendCommand(configBuffer);
+  remoteControl->sendCommand(configBuffer);
 }
 
 void SR_HandleCommand(char *data, size_t len)
 {
   data[len] = '\0';
   Serial.printf("[-1] Message: %s\r\n", data);
-  if (emergencyStop)
+  const char* message = HandleCommand(data);
+  if(message != nullptr)
   {
-    Serial.printf("[-1] EMERGENCY STOP\nDevice will not accept commands until rebooted.\n");
-    //server->textAll("ERROR: EMERGENCY STOP");
-    return;
+    remoteControl->sendCommand(message);
   }
+}
+
+const char* HandleCommand(char* data)
+{
+  std::lock_guard<std::mutex> guard(DevicesMutex);
+  if (emergencyStop)
+    return "ERROR: EMERGENCY STOP";
 
   char *command = strtok((char *)data, " ");
   char *id_str = strtok(0, " ");
   char *intensity_str = strtok(0, " ");
 
   if (command == 0)
-  {
-    Serial.printf("[-1] Text Error: Invalid Message\r\n");
-    //client->text("ERROR: INVALID FORMAT");
-    return;
-  }
+    return "ERROR: INVALID FORMAT";
 
   // Reset the current command status, and stop sending the command.
   if (*command == 'R')
@@ -540,9 +463,9 @@ void SR_HandleCommand(char *data, size_t len)
     {
       device->SetCommand(Command::None);
     }
-    //client->text("OK: R");
-    return;
+    return "OK: R";
   }
+
   // Triggers an emergency stop. This will require the ESP-32 to be rebooted.
   else if (*command == 'X')
   {
@@ -551,61 +474,51 @@ void SR_HandleCommand(char *data, size_t len)
     {
       device->SetCommand(Command::None);
     }
-    //client->text("OK: EMERGENCY STOP");
-    return;
+    return "OK: EMERGENCY STOP";
   }
   // Ping to reset the lost connection timeout.
   else if (*command == 'P')
   {
     lastWatchdogTime = millis();
-    return;
+    return nullptr;
   }
 
   if (id_str == 0 || intensity_str == 0)
-  {
-    Serial.printf("[-1] Text Error: Invalid Message\n");
-    //client->text("ERROR: INVALID FORMAT");
-    return;
-  }
+    return "ERROR: INVALID FORMAT";
 
   uint16_t id = atoi(id_str);
   uint8_t intensity = atoi(intensity_str);
 
   if (id > 3)
-    return;
+    return "ERROR: INVALID ID";
 
   // Light
   if (*command == 'L' && EEPROMData.Devices[id].FeatureEnabled(Command::Light))
   {
     Devices[id]->SetCommand(Command::Light, intensity);
-    //client->text("OK: L");
-    return;
+    return "OK: L";
   }
   // Beep
   else if (*command == 'B' && EEPROMData.Devices[id].FeatureEnabled(Command::Beep))
   {
     Devices[id]->SetCommand(Command::Beep, intensity);
-    //client->text("OK: B");
-    return;
+    return "OK: B";
   }
   // Vibrate
   else if (*command == 'V' && EEPROMData.Devices[id].FeatureEnabled(Command::Vibrate))
   {
     Devices[id]->SetCommand(Command::Vibrate, intensity);
-    //client->text("OK: V");
-    return;
+    return "OK: V";
   }
   // Shock
   else if (*command == 'S' && EEPROMData.Devices[id].FeatureEnabled(Command::Shock))
   {
     Devices[id]->SetCommand(Command::Shock, intensity);
-    //client->text("OK: S");
-    return;
+    return "OK: S";
   }
   else
   {
-    Serial.printf("[-1] Ignored Command %c\n", *command);
-    return;
+    return nullptr;
   }
 }
 

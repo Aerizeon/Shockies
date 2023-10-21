@@ -55,7 +55,7 @@ struct EEPROM_Settings
   char DeviceId[UUID_STR_LEN];
   /// Require DeviceID to be part of the local websocket URI (ws://shockies.local/<deviceID>)
   bool RequireDeviceId = false;
-  /// Allow the device to be controlled from shockies.dev (not yet implemented - TODO)
+  /// Allow the device to be controlled from shockies.dev. This only works for me at the moment.
   bool AllowRemoteAccess = false;
   /// Allow up to 3 devices to be configured
   Settings Devices[3];
@@ -87,6 +87,8 @@ void WS_SendConfig();
 void SR_HandleConnected();
 
 void SR_HandleCommand(char* data, size_t len);
+
+const char* HandleCommand(char* data);
 
 void UpdateDevices();
 
