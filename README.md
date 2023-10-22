@@ -1,5 +1,5 @@
 # Shockies
-ESP32 Firmware for controlling **Petrainer PET998DR** collars using a **STX882 433.9Mhz ASK Transmitter**
+ESP32 Firmware for controlling **Petrainer PET998DR** and **FunniPets** collars using a **STX882 433.9Mhz ASK Transmitter**
 
 ## Disclaimer
 I am not responsible for how you use or misuse this software, or any hardware controlled by this software.
@@ -16,8 +16,9 @@ I am not responsible for any malfunctions, and make no guarantees about safety o
 
 ## Hardware
 ### Required Items
-* Petrainer PET998DR
-  - Can be found on [eBay](https://www.ebay.com/itm/181705501723)
+* Petrainer PET998DR or FunniPets collars
+  - PET998DR can be found on [eBay](https://www.ebay.com/itm/181705501723)
+  - FunniPets collars can be found on [Amazon](https://www.amazon.com/FunniPets-Training-Collar-Accessory-Receiver/dp/B0874GMM93/)
 * ESP32 (NOT ESP32-S2!)
   - [ESP32 Developer boards](https://www.amazon.com/dp/B0718T232Z) are easiest to work with
   - [ESP32-WROOM-32D](https://www.digikey.com/en/products/detail/espressif-systems/ESP32-WROOM-32D-4MB/9381716) will also work
@@ -57,27 +58,11 @@ Once you verify these connections are correct, you're now ready to connect the E
 
 ## Setup
 Setting up Shockies and your collar
-### Arduino IDE & Flashing
-1. Download the arduino IDE from the [arduino.cc website](https://www.arduino.cc/en/software/) or the [Microsoft App Store](https://www.microsoft.com/store/apps/9nblggh4rsd8)
-2. Follow [these instructions](https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html#installing-using-boards-manager) to install ESP32 Board support for the Arduino IDE - use the stable branch URL.
-3. Double click **Shockies.ino** to open it in the Arduino editor
-4. Configure the correct board settings (May differ if using something other than the HiLetGo ESP32 Developer Board)
-   - Select the following board: Tools > Board > ESP32 Arduino > Node32s
-   - Select the correct upload speed: Tools > Upload Speed > 921600
-   - Select the correct port: Tools > Port 
-     - The correct port will depend on your computer
-     - Open device manager (on windows), expand 'Ports (COM and LPT)' and find an entry with 'Silicon Labs CP210x USB to UART Bridge'
-     - If no device exists, you may need to install the [CP210x Driver](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers)
- 5. Install The following libraries:
-    - [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
-    - [AsyncTCP](https://github.com/me-no-dev/AsyncTCP)
- 6. Install the [ESP32 Filesystem Uploader](https://github.com/me-no-dev/arduino-esp32fs-plugin) for Arduino IDE 1.x. This will be used to upload the files under `/data/`
- 7. Select Tools > Serial Monitor to view the debug output from your board.
-    - Make sure the Baud Rate is set to 9600
- 8. Select Sketch > Upload to upload the firmware to your ESP32.
-    - You may need to hold down the IO0 button (right-hand button on the HiLetGo ESP32 Developer Board) during the upload process
- 9. Select Tools > ESP32 Sketch Data Upload to upload the HTML files to your ESP32.
-    - You may need to hold down the IO0 button (right-hand button on the HiLetGo ESP32 Developer Board) during the upload process
+### Visual Studio Code + PlatformIO & Flashing
+1. Download the VSCode IDE from the [visual studio code website](https://code.visualstudio.com/download)
+2. Install the PlatformIO IDE extension in VSCode
+3. Open the Shockies project folder in VSCode, and allow PlatformIO time to get setup
+4. Select the PlatformIO tab on the left side of the VSCode window, and select a task (such as *Upload** or *Upload and Monitor*) to build and upload the shockies code for your device. If you are using a different ESP32 board than the default, select *PIO Home > Boards* and select a different board configuration.
 
 ### Wi-Fi Setup
 During the first boot, the Serial Monitor will display something similar to the following:
@@ -118,14 +103,17 @@ http://192.168.2.2
 ```
 You can now access your device using http://shockies.local or using the IP address shown in the Serial Monitor.
 
-### Safety Configuration
-The safety configuration page found on http://shockies.local allows you to set maximum values for intensity and duration, that override values sent to the device.
+### Configuration
+The configuration page found on http://shockies.local allows you to set maximum values for intensity and duration for each of the 3 mappable collars. 
+Additionally, you can choose between the *PET998DR Clone* and *FunniPets* collars
 
 #### Enabled Features
-Allows the user to specified which features are enabled. 
-* Beep - Default ON
-* Vibrate - Default ON
-* Shock - Default ON
+Allows the user to specified which collar features are enabled. 
+* Light
+* Beep
+* Vibrate
+* Shock
+Not all features will be available on every collar, so these settings may not have any noticable effect.
 
 #### Maximum Intensity Settings
 Specifies the maximum allowable intensity and continuious duration for Shock and Vibrate commands.
@@ -136,10 +124,11 @@ Specifies the maximum allowable intensity and continuious duration for Shock and
 * Max Vibrate Duration - Default 5 Seconds
 
 Please **CAREFULLY** experiment starting with low (<5%) shock intensity, and slowly increase it until you find a suitable maximum intensity.
+The **Shock Interval** setting 
 
 ## Firmware Updates
 The updates page on http://shockies.local/update allows you to remotely update the firmware on your device. The username will be `admin`, and the password will be the same as your WiFi network password.
-From this page, you can upload `Shockies.ino.bin` and 'Shockies.spiffs.bin` which can be found in the [releases](https://github.com/Aerizeon/Shockies/releases) section.
+From this page, you can upload `firmware.bin` and `spiffs.bin` which can be found in the [releases](https://github.com/Aerizeon/Shockies/releases) section.
 
 
 

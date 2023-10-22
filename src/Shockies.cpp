@@ -340,14 +340,14 @@ void HTTP_FILE_Update(AsyncWebServerRequest *request, String fileName, size_t in
   if (index == 0)
   {
     Serial.println(fileName);
-    if (fileName == "Shockies.ino.bin")
+    if (fileName == "firmware.bin")
     {
       if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH))
       {
         return request->send(400, "text/plain", "Update Unable to start");
       }
     }
-    else if (fileName == "Shockies.spiffs.bin")
+    else if (fileName == "spiffs.bin")
     {
       if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS))
       {
