@@ -8,8 +8,8 @@ h1, h3 {
 	color: #444444;
 	margin: 5px;
 }
-input {
-	margin: 5px;
+a {
+	text-align: center;
 }
 .button {
 	display: block;
@@ -26,14 +26,12 @@ input {
 .button:active {
 	background-color: #2980b9;
 }
-.flex-column {
-	display:flex;
-	flex-direction:column;
-}
-.flex-end {
-	align-items: flex-end;
-}
-.flex-center {
+.input-grid {
+	display: grid;
+	grid-template-columns: fit-content(30ch) fit-content(50ch);
+	grid-template-rows: auto;
+	grid-auto-rows: min-content;
+	grid-gap: 5px 5px;
 	align-items: center;
 }
 .tab-wrap {
@@ -146,6 +144,10 @@ input {
 	opacity: 0;
 	left: 0;
 	border-radius: 1px;
+	display: flex;
+	align-items:stretch;
+	flex-direction: column;
+	gap: 20px 0px;
 }
 @media (prefers-color-scheme: dark) {
 	html {
@@ -185,7 +187,7 @@ input {
 		color: #ccc;
 		box-shadow: 0 -1px 0 #444 inset;
 	}
-	input {
+	input, select {
 		background-color: #666;
 		color: #D0D0D0;
 		border-color: #808080;
